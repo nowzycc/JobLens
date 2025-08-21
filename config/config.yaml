@@ -1,0 +1,48 @@
+lens_config:
+  start_mode: single
+  lock_path: /tmp/JobLens/JobLens.lock
+  pid_dir: /tmp/JobLens/node_pids
+  max_collector_threads: 4
+
+base_writer_config:
+  freq: 10
+  write_timeout: 5
+
+file_writer_config:
+  file_path: /tmp/joblens_test
+  freq: 10
+  write_timeout: 5
+
+condor_classads_writer_config:
+  freq: 10
+  write_timeout: 5
+  chirp_path: /usr/libexec/condor/condor_chirp
+  classads_path: /tmp/classads_test
+  chirp_config_dir: /tmp/chirp_configs
+  chirp_config_path: /tmp/chirp_configs/used_config
+
+influxdb_writer_config:
+  version: 3
+  host: 192.168.81.88
+  port: 8181
+  database: pvm088_test
+  token: apiv3_IWvzziQxis-9epEynlSotuaCjhXqUYuc9c7l6vH6qFlAgcwZPHK1rOjXFWW2xadqCPrg8AZm3abi-vDRvQ-91g
+  timeout: 5
+  mode: async
+  batch_size: 1000
+  freq: 10
+  write_timeout: 5
+  influxdb_path: /tmp/influxdb_test
+
+writer_manager_config:
+  writers:
+    - name: file_writer
+      type: file
+      config: file_writer_config
+    - type: condor_classads
+      config: condor_classads_writer_config
+    - type: influxdb
+      config: influxdb_writer_config
+
+collector_config:
+  freq: 10
