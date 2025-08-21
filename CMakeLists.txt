@@ -11,13 +11,36 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ----------------------------------------------
 # 2. 依赖查找
-#    这里只列出可能用到的常用系统库；
-#    如果项目里还用到了其它第三方库（例如 libbpf、Threads 等），
-#    请自行追加 find_package(...)。
 # ----------------------------------------------
-find_package(fmt REQUIRED)  
-find_package(spdlog REQUIRED) 
-find_package(yaml-cpp REQUIRED)
+include(FetchContent)
+
+# 统一开关：若希望强制使用系统包，可手动置 OFF
+option(JOBLENS_AUTO_DEPS "Auto-download missing 3rd-party libs" ON)
+
+macro(fetch_if_missing pkg url)
+    if(NOT ${pkg}_FOUND AND JOBLENS_AUTO_DEPS)
+        FetchContent_Declare(${pkg}
+            GIT_REPOSITORY ${url}
+        )
+        FetchContent_MakeAvailable(${pkg})
+    endif()
+endmacro()
+
+# 1) fmt
+find_package(fmt QUIET)
+fetch_if_missing(fmt https://github.com/fmtlib/fmt.git)
+
+# 2) spdlog（header-only 也能工作）
+find_package(spdlog QUIET)
+fetch_if_missing(spdlog https://github.com/gabime/spdlog.git)
+
+# 3) yaml-cpp
+find_package(yaml-cpp QUIET)
+fetch_if_missing(yaml-cpp https://github.com/jbeder/yaml-cpp.git)
+
+# 4) Howard Hinnant date
+find_package(date QUIET)
+fetch_if_missing(date https://github.com/HowardHinnant/date.git)
 
 # ----------------------------------------------
 # 3. 变量：把路径集中定义，方便后续修改
