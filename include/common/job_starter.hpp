@@ -52,7 +52,6 @@ public:
 private:
     // 真正的工作线程函数
     void worker(int pid,
-                std::chrono::milliseconds timeout,
                 OnExit cb);
     pid_t childPID;
     std::mutex              mtx_;

@@ -11,7 +11,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <thread>
-
+#include <spdlog/spdlog.h>
 namespace {
 
 int create_and_bind_tcp(const std::string& host_port) {
@@ -71,13 +71,21 @@ public:
             fd_ = open_file(cfg_.path);
         }
         epoll_fd_ = epoll_create1(0);
-        if (epoll_fd_ < 0) throw std::runtime_error("epoll_create1");
+        if (epoll_fd_ < 0){
+            ::close(fd_);
+            spdlog::error("epoll_create1 failed: {}", strerror(errno));
+            throw std::runtime_error("epoll_create1");
+        }
 
         epoll_event ev{};
         ev.events = EPOLLIN;
         ev.data.fd = fd_;
-        if (epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fd_, &ev) < 0)
+        if (epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fd_, &ev) < 0){
+            ::close(fd_);
+            ::close(epoll_fd_);
+            spdlog::error("epoll_ctl add failed: {}", strerror(errno));
             throw std::runtime_error("epoll_ctl add");
+        }
     }
 
     ~Impl() {
@@ -95,7 +103,7 @@ public:
                 int nf = epoll_wait(epoll_fd_, events, max_events, 200);
                 if (nf < 0) {
                     if (errno == EINTR) continue;
-                    std::cerr << "epoll_wait error " << strerror(errno) << "\n";
+                    spdlog::error("epoll_wait failed: {}", strerror(errno));
                     break;
                 }
                 for (int i = 0; i < nf; ++i) {
@@ -149,7 +157,11 @@ private:
 // public 接口转发
 StreamWatcher::StreamWatcher(const Config& cfg, Callback cb)
     : pImpl_(std::make_unique<Impl>(cfg, std::move(cb))) {
-        
+
+    spdlog::info("StreamWatcher: started watching {}",
+                cfg.type == Type::TCP ? ("tcp:" + cfg.path) :
+                cfg.type == Type::FIFO ? ("fifo:" + cfg.path) :
+                ("file:" + cfg.path));
     }
 StreamWatcher::~StreamWatcher() = default;
 void StreamWatcher::start() { pImpl_->start(); }

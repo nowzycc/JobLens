@@ -2,11 +2,15 @@
 #include <sstream>
 #include "common/config.hpp"
 
+#include <iostream>
+
+const char* COLLECTOR_TYPE_PROC = "ProcCollector";
+
 JobInfoCollector::JobInfoCollector()
 {
     job_adder_.emplace(StreamWatcher::Config{
         .type = StreamWatcher::Type::FIFO,
-        .path = Config::instance().getString("collector", "job_adder_fifo")
+        .path = Config::instance().getString("collectors_config", "job_adder_fifo")
     },
     [this](const char* buf, std::size_t len) {
         Job job;
@@ -16,7 +20,7 @@ JobInfoCollector::JobInfoCollector()
 
     registerCollectFuncs();
     registerFinishCallbacks();
-
+    std::cout<<"registerFinishCallbacks done"<<std::endl;
     spdlog::info("JobInfoCollector: initialized with {} collect functions and {} finish callbacks",
                 collectFuncs_.size(), finishCallbacks_.size());
 }
@@ -108,7 +112,8 @@ void JobInfoCollector::registerCollectFuncs() {
         std::string type;
         std::string config;
     };
-    auto collectors = global_config.getArray<Collector>("collector", "collectors",
+    
+    auto collectors = global_config.getArray<Collector>("collectors_config", "collectors",
         [](const YAML::Node& node) {
             Collector c;
             c.name = node["name"].as<std::string>();
@@ -116,8 +121,9 @@ void JobInfoCollector::registerCollectFuncs() {
             c.config = node["config"].as<std::string>();
             return c;
         });
+
     for (const auto& collector : collectors) {
-        if (collector.type == "proc_collector") {
+        if (collector.type == COLLECTOR_TYPE_PROC) {
             auto t = std::make_tuple(
                 collector.name,
                 proc_collector::collect

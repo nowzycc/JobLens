@@ -7,19 +7,38 @@
 #include <stdexcept>
 #include <fmt/core.h>
 
+const char* WRITER_TYPE_FILE = "FileWriter";
+
 writer_manager::writer_manager() {
+    struct Writer{
+        std::string name;
+        std::string type;
+        std::string config;
+    };
     auto global_config = Config::instance();
-    auto writer_names = global_config.getArray<std::string>("writer", "writers");
-    for (const auto& name : writer_names) {
-        auto writer_type = global_config.getString(name, "type");
-        if (writer_type == "FileWriter") {
-            auto path = global_config.getString(name, "path");
-            auto writer = std::make_unique<FileWriter>(path);
-            addWriter(std::move(writer));
+    spdlog::info("writer_manager: initializing...");
+    auto writers = global_config.getArray<Writer>("writers_config", "writers", 
+        [](const YAML::Node& node) {
+            Writer w;
+            w.name = node["name"].as<std::string>();
+            w.type = node["type"].as<std::string>();
+            w.config = node["config"].as<std::string>();
+            return w;
+        });
+    spdlog::info("writer_manager: found {} writers", writers.size());
+    for (const auto& writer : writers) {
+        auto writer_type = writer.type;
+        auto name = writer.name;
+        auto config = writer.config;
+        if (writer_type == WRITER_TYPE_FILE) {
+            auto path = global_config.getString(config, "path");
+            auto writer_handle = std::make_unique<FileWriter>(path);
+            addWriter(std::move(writer_handle));
         } else {
             throw std::runtime_error(fmt::format("Unknown writer type: {}", writer_type));
         }
     }
+    spdlog::info("writer_manager: initialized with {} writers", writers_.size());
 }
 
 writer_manager::~writer_manager() {

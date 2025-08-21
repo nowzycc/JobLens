@@ -40,10 +40,15 @@ bool JobStarter::launch(const Options& opt) {
         seteuid(getuid());
         // 组装 argv
         std::vector<char*> argv;
+        std::string str_args;
+        for (const auto& arg : opt.args) {
+            str_args += arg + " ";
+        }
         argv.push_back(const_cast<char*>(opt.exe.c_str()));
         for (auto& s : opt.args) argv.push_back(const_cast<char*>(s.c_str()));
         argv.push_back(nullptr);
-
+        spdlog::info("JobStarter: exec {}", opt.exe);
+        spdlog::info("JobStarter: args {}", str_args);
         execvp(argv[0], argv.data());
         // execvp 只有失败才会返回
         spdlog::error("JobStarter: execvp failed for {}", opt.exe);
@@ -54,7 +59,7 @@ bool JobStarter::launch(const Options& opt) {
     spdlog::info("JobStarter: started child {}", pid);
     childPID = pid; 
     std::chrono::milliseconds tout = opt.timeout.value_or(0ms);
-    std::thread th(&JobStarter::worker, this, pid, tout, std::move(local_cb));
+    std::thread th(&JobStarter::worker, this, pid, std::move(local_cb));
     worker_ = std::move(th);
     return true;
 }
@@ -62,39 +67,15 @@ bool JobStarter::launch(const Options& opt) {
 // ------------------------------------------------------------------
 // 细节 3：工作线程——等待子进程结束并调用回调
 void JobStarter::worker(int pid,
-                      std::chrono::milliseconds timeout,
                       OnExit cb)
 {
     int status = 0;
     pid_t ret  = 0;
 
-    if (timeout > 0ms) {
-        // 使用 waitpid + 超时轮询
-        auto deadline = std::chrono::steady_clock::now() + timeout;
-        do {
-            ret = waitpid(pid, &status, WNOHANG);
-            if (ret == pid) break;
-            if (shutdown_.load(std::memory_order_acquire)) {
-                // 细节 4：收到全局关闭信号，强制杀进程
-                ::kill(pid, SIGKILL);
-                waitpid(pid, &status, 0);   // 回收
-                return;
-            }
-            std::this_thread::sleep_for(10ms);
-        } while (std::chrono::steady_clock::now() < deadline);
-
-        if (ret == 0) { // 仍然没退出，超时
-            ::kill(pid, SIGKILL);
-            waitpid(pid, &status, 0);
-            status = -1;   // 自定义超时码
-            spdlog::warn("JobStarter: child {} killed on timeout", pid);
-        }
-    } else {
-        // 永久等待
-        do {
-            ret = waitpid(pid, &status, 0);
-        } while (ret == -1 && errno == EINTR);
-    }
+    do {
+        ret = waitpid(pid, &status, 0);
+    } while (ret == -1 && errno == EINTR);
+    
 
     int exit_code = 0;
     if (WIFEXITED(status))

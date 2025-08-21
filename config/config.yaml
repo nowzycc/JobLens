@@ -7,34 +7,27 @@ lens_config:
 writers_config:
   writers:
     - name: file_writer
-      type: file
+      type: FileWriter
       config: file_writer_config
-    - type: condor_classads
-      config: condor_classads_writer_config
-    - type: influxdb
-      config: influxdb_writer_config
 
 collectors_config:
+  job_adder_fifo: /tmp/JobLens/job_adder_fifo
   collectors:
     - name: job_info_collector
       type: job_info
       config: job_info_collector_config
-    - name: condor_classads_collector
-      type: condor_classads
-      config: condor_classads_collector_config
-
 
 base_writer_config:
-  freq: 10
   write_timeout: 5
 
+job_info_collector_config:
+
+
 file_writer_config:
-  file_path: /tmp/joblens_test
-  freq: 10
+  path: /tmp/joblens_test
   write_timeout: 5
 
 condor_classads_writer_config:
-  freq: 10
   write_timeout: 5
   chirp_path: /usr/libexec/condor/condor_chirp
   classads_path: /tmp/classads_test

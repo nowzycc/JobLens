@@ -7,6 +7,7 @@ Config::Config(const std::string& filePath)
         root_ = YAML::LoadFile(filePath);
         spdlog::info("Config: loaded configuration from {}", filePath);
     } catch (const YAML::BadFile& e) {
+        spdlog::error("Config: failed to load configuration file {}: {}", filePath, e.what());
         throw std::runtime_error("Config: cannot open file: " + filePath);
     }
 }
@@ -17,6 +18,7 @@ int Config::getInt(const std::string& parentKey,
     try {
         return root_[parentKey][key].as<int>();
     } catch (const YAML::Exception& e) {
+        spdlog::error("Config: error decoding int [{}][{}]: {}", parentKey, key, e.what());
         throw std::runtime_error("Config: missing or bad type for [" +
                                  parentKey + "][" + key + "]");
     }
@@ -28,6 +30,7 @@ double Config::getDouble(const std::string& parentKey,
     try {
         return root_[parentKey][key].as<double>();
     } catch (const YAML::Exception& e) {
+        spdlog::error("Config: error decoding double [{}][{}]: {}", parentKey, key, e.what());
         throw std::runtime_error("Config: missing or bad type for [" +
                                  parentKey + "][" + key + "]");
     }
@@ -39,6 +42,7 @@ bool Config::getBool(const std::string& parentKey,
     try {
         return root_[parentKey][key].as<bool>();
     } catch (const YAML::Exception& e) {
+        spdlog::error("Config: error decoding bool [{}][{}]: {}", parentKey, key, e.what());
         throw std::runtime_error("Config: missing or bad type for [" +
                                  parentKey + "][" + key + "]");
     }
@@ -50,6 +54,7 @@ std::string Config::getString(const std::string& parentKey,
     try {
         return root_[parentKey][key].as<std::string>();
     } catch (const YAML::Exception& e) {
+        spdlog::error("Config: error decoding string [{}][{}]: {}", parentKey, key, e.what());
         throw std::runtime_error("Config: missing or bad type for [" +
                                  parentKey + "][" + key + "]");
     }

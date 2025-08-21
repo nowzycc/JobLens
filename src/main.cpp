@@ -41,6 +41,17 @@ void onBecomeMaster() {
     
 }
 
+void onBecomeSlave() {
+    std::cout << "Node has become slave." << std::endl;
+    if (first_run) {
+        first_run = false;
+
+    }
+    else{
+        // 从系统设计角度来说不会运行到这里
+    }
+}
+
 void print_logo(){
     std::cout<< R"(    _____          __       __                                 
    |     \        |  \     |  \
@@ -54,17 +65,6 @@ void print_logo(){
                                                                
                                                                
                                                                )" << std::endl;
-}
-
-void onBecomeSlave() {
-    std::cout << "Node has become slave." << std::endl;
-    if (first_run) {
-        first_run = false;
-
-    }
-    else{
-        // 从系统设计角度来说不会运行到这里
-    }
 }
 
 void init() {

@@ -4,7 +4,7 @@
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
-
+#include <iostream>
 class Config {
 public:
     // 从文件加载
@@ -31,6 +31,7 @@ public:
         try {
             return root_[parentKey][key].as<std::vector<T>>();
         } catch (const YAML::Exception& e) {
+            spdlog::error("Config: error decoding array [{}][{}]: {}", parentKey, key, e.what());
             throw std::runtime_error("Config: missing or bad type for [" +
                                     parentKey + "][" + key + "]");
         }
@@ -48,11 +49,18 @@ public:
                 throw YAML::Exception(YAML::Mark::null_mark(),
                                     "not a sequence");
 
+            spdlog::trace("Config: decoding array [{}][{}]", parentKey, key);
+
             out.reserve(list.size());
-            for (const auto& node : list)
+            for (const auto& node : list){
                 out.push_back(decoder(node));
+            }
+
+            spdlog::trace("Config: decoded {} items from [{}][{}]", out.size(), parentKey, key);
+
             return out;
         } catch (const YAML::Exception& e) {
+            spdlog::error("Config: error decoding array [{}][{}]: {}", parentKey, key, e.what());
             throw std::runtime_error("Config: missing or bad array [" +
                                     parentKey + "][" + key + "]");
         }
