@@ -55,11 +55,7 @@ bool JobStarter::launch(const Options& opt) {
     childPID = pid; 
     std::chrono::milliseconds tout = opt.timeout.value_or(0ms);
     std::thread th(&JobStarter::worker, this, pid, tout, std::move(local_cb));
-
-    {
-        std::lock_guard lg(mtx_);
-        workers_.push_back(std::move(th));
-    }
+    worker_ = std::move(th);
     return true;
 }
 
@@ -117,7 +113,7 @@ void JobStarter::worker(int pid,
 void JobStarter::shutdown() {
     shutdown_.store(true, std::memory_order_release);
     std::unique_lock lg(mtx_);
-    for (auto& th : workers_)
-        if (th.joinable()) th.join();
-    workers_.clear();
+    if (worker_.joinable()) {
+        worker_.join(); // 等待工作线程结束
+    }
 }

@@ -36,7 +36,7 @@ base_writer::~base_writer()
 // -------------------- 公有接口 --------------------
 void base_writer::on_finish(std::string collect_name,
                             const Job& job,
-                            const void* data,
+                            const std::any data,
                             std::chrono::system_clock::time_point ts)
 {
     auto t = std::make_tuple(std::move(collect_name), job, data, ts);
@@ -48,7 +48,7 @@ OnFinish base_writer::get_onFinishCallback()
 {
     return [this](const std::string& collect_name,
                   const Job& job,
-                  const void* data,
+                  const std::any data,
                   std::chrono::system_clock::time_point ts)
     { on_finish(collect_name, job, data, ts); };
 }

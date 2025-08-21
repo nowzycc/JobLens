@@ -23,7 +23,7 @@ StateManager& StateManager::instance() {
 void StateManager::on_promote() {
     std::lock_guard<std::mutex> lk(mu_);
     role_ = "master";
-    std::cout << "[State] promoted to master, last_value=" << value_ << "\n";
+    spdlog::info("StateManager: promoted to master");
 }
 
 void StateManager::on_demote() {
@@ -57,7 +57,9 @@ DistributedNode::DistributedNode() {
     node_id_ = getpid();
     auto global_config = Config::instance();
     pid_dir_   = global_config.getString("lens_config","pid_dir");
+    spdlog::info("DistributedNode: using PID directory {}", pid_dir_.string());
     lock_path_ = global_config.getString("lens_config","lock_path");
+    spdlog::info("DistributedNode: using lock path {}", lock_path_.string());
 
     fs::create_directories(pid_dir_);
     fs::create_directories(fs::path(lock_path_).parent_path());
@@ -269,6 +271,7 @@ void DistributedNode::setup_signal_handlers() {
     sigaction(SIGUSR1, &sa, nullptr);
     sigaction(SIGUSR2, &sa, nullptr);
     sigaction(SIGTERM, &sa, nullptr);
+    spdlog::info("DistributedNode: signal handlers set up");
 }
 
 void DistributedNode::try_promote() {

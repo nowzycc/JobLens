@@ -5,6 +5,7 @@ Config::Config(const std::string& filePath)
 {
     try {
         root_ = YAML::LoadFile(filePath);
+        spdlog::info("Config: loaded configuration from {}", filePath);
     } catch (const YAML::BadFile& e) {
         throw std::runtime_error("Config: cannot open file: " + filePath);
     }
@@ -54,17 +55,7 @@ std::string Config::getString(const std::string& parentKey,
     }
 }
 
-template<typename T>
-std::vector<T> Config::getArray(const std::string& parentKey,
-                                const std::string& key) const
-{
-    try {
-        return root_[parentKey][key].as<std::vector<T>>();
-    } catch (const YAML::Exception& e) {
-        throw std::runtime_error("Config: missing or bad type for [" +
-                                 parentKey + "][" + key + "]");
-    }
-}
+
 
 // 常见模板实例化
 template std::vector<int>    Config::getArray<int>    (const std::string&, const std::string&) const;

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <unordered_map>
 #include <functional>
+#include <any>
 
 enum class CollectorType {
     ProcColletor,      // 采集 /proc/<pid>/stat
@@ -19,4 +20,4 @@ struct Job {
     std::unordered_map<std::string, void*> JobInfo; // 用 json 存任意值
 };
 
-using OnFinish = std::function<void(const std::string, const Job&, const void*, std::chrono::system_clock::time_point)>;
+using OnFinish = std::function<void(const std::string, const Job&, const std::any, std::chrono::system_clock::time_point)>;

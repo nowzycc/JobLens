@@ -4,6 +4,26 @@ lens_config:
   pid_dir: /tmp/JobLens/node_pids
   max_collector_threads: 4
 
+writers_config:
+  writers:
+    - name: file_writer
+      type: file
+      config: file_writer_config
+    - type: condor_classads
+      config: condor_classads_writer_config
+    - type: influxdb
+      config: influxdb_writer_config
+
+collectors_config:
+  collectors:
+    - name: job_info_collector
+      type: job_info
+      config: job_info_collector_config
+    - name: condor_classads_collector
+      type: condor_classads
+      config: condor_classads_collector_config
+
+
 base_writer_config:
   freq: 10
   write_timeout: 5
@@ -34,15 +54,3 @@ influxdb_writer_config:
   write_timeout: 5
   influxdb_path: /tmp/influxdb_test
 
-writer_manager_config:
-  writers:
-    - name: file_writer
-      type: file
-      config: file_writer_config
-    - type: condor_classads
-      config: condor_classads_writer_config
-    - type: influxdb
-      config: influxdb_writer_config
-
-collector_config:
-  freq: 10

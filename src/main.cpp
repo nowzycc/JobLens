@@ -1,4 +1,6 @@
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LOGGER_TRACE
 #include <iostream>
+#include <spdlog/spdlog.h>
 
 #include "utils/cxxopts.hpp"
 
@@ -19,7 +21,7 @@ void onExitCallback(int pid, int exit_code) {
 bool first_run = true;
 
 void onBecomeMaster() {
-    std::cout << "Node has become master." << std::endl;
+    spdlog::info("Main: Node has become master.");
     if (first_run) {
         first_run = false;
         auto pid = JobStarter::instance().getChildPID();
@@ -65,8 +67,15 @@ void onBecomeSlave() {
     }
 }
 
-int main(int argc, char* argv[]) {
+void init() {
+    // 初始化日志系统
+    spdlog::set_level(spdlog::level::info); // 设置日志级别
+    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%l] %v"); // 设置日志格式
     print_logo();
+}
+
+int main(int argc, char* argv[]) {
+    init();
     cxxopts::Options options("JobLens", "A job monitor system");
     options.add_options()
         ("h,help", "Show help")
@@ -91,8 +100,6 @@ int main(int argc, char* argv[]) {
 
     DistributedNode::instance().set_become_slave_callback(onBecomeSlave);
 
-    DistributedNode::instance().start();
-
     JobStarter::instance().setCallback(onExitCallback);
 
     auto ret = JobStarter::instance().launch({
@@ -105,6 +112,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Failed to launch job." << std::endl;
         return 1;
     }
+
+    DistributedNode::instance().start();
 
     return 0;
 }

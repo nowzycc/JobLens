@@ -33,9 +33,9 @@ public:
     JobInfoCollector& operator=(JobInfoCollector&&)      = default;
 
     // 对外接口
-    void addCollectFunc(std::string name, std::function<void*(const Job&)> f);
+    void addCollectFunc(std::string name, std::function<std::any(Job&)> f);
     void addCallback(OnFinish cb);
-    void addJob(const Job& job);
+    void addJob(Job job);
     void delJob(int jobID);
     void start();
     void shutdown();
@@ -55,7 +55,7 @@ private:
 
     std::mutex              m_;
     std::vector<std::thread> threads_;
-    std::vector<std::tuple<std::string, std::function<void*(const Job&)>>> collectFuncs_;
+    std::vector<std::tuple<std::string, std::function<std::any(Job&)>>> collectFuncs_;
     std::vector<OnFinish>   finishCallbacks_;
     std::vector<Job>        currJobs_;
     bool                    running_ = false;

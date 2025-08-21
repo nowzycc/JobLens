@@ -24,8 +24,6 @@ public:
     JobStarter(){
         // 初始化工作线程池
         auto global_config = Config::instance();
-        auto max_collector_threads = global_config.getInt("lens_config", "max_collector_threads");
-        workers_.reserve(max_collector_threads); // 预留空间，避免频繁扩容
     };
     // ~JobStarter() { shutdown(); }
 
@@ -59,6 +57,6 @@ private:
     pid_t childPID;
     std::mutex              mtx_;
     OnExit                  callback_;          // 外部回调
-    std::vector<std::thread> workers_;          // 所有工作线程
+    std::thread worker_;          // 工作线程
     std::atomic<bool>       shutdown_{false};   // 全局关闭标志
 };

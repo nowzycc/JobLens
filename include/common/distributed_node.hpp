@@ -1,5 +1,5 @@
 #pragma once
-
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LOGGER_TRACE
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -12,8 +12,9 @@
 
 // 第三方
 #include "utils/nlohmann/json.hpp"
+#include <spdlog/spdlog.h>
 
-// 如果你们的 Config 头文件路径不同，请自行修改
+
 #include "common/config.hpp"
 
 namespace fs = std::filesystem;

@@ -19,7 +19,7 @@ namespace fmt {}  // 占位，无实质依赖
 
 using write_data = std::tuple<std::string,
                               const Job&,
-                              const void*,
+                              const std::any,
                               std::chrono::system_clock::time_point>;
 
 class base_writer
@@ -30,7 +30,7 @@ public:
 
     void on_finish(std::string collect_name,
                    const Job& job,
-                   const void* data,
+                   const std::any data,
                    std::chrono::system_clock::time_point ts);
 
     OnFinish get_onFinishCallback();

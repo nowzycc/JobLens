@@ -10,7 +10,7 @@
 #include <fmt/core.h>
 #include <memory>
 #include "collector/collector_type.h"
-
+#include <any>
 // 前置声明，降低头文件耦合
 class Job;
 
@@ -38,6 +38,6 @@ std::optional<std::size_t> getMemTotalKb();
 std::unique_ptr<proc_info> snapshotOf(int pid);
 
 /* 根据 Job 对象采集所有目标进程 */
-std::vector<std::unique_ptr<proc_info>> collect(Job& job);
+std::any collect(Job& job);
 
 } // namespace proc_collector

@@ -1,5 +1,6 @@
 #include "collector/job_info_collector.hpp"
 #include <sstream>
+#include "common/config.hpp"
 
 JobInfoCollector::JobInfoCollector()
 {
@@ -15,11 +16,14 @@ JobInfoCollector::JobInfoCollector()
 
     registerCollectFuncs();
     registerFinishCallbacks();
+
+    spdlog::info("JobInfoCollector: initialized with {} collect functions and {} finish callbacks",
+                collectFuncs_.size(), finishCallbacks_.size());
 }
 
 JobInfoCollector::~JobInfoCollector() { shutdown(); }
 
-void JobInfoCollector::addCollectFunc(std::string name, std::function<void*(const Job&)> f) {
+void JobInfoCollector::addCollectFunc(std::string name, std::function<std::any(Job&)> f) {
     std::lock_guard lg(m_);
     collectFuncs_.push_back(std::make_tuple(std::move(name), std::move(f)));
 }
@@ -29,7 +33,7 @@ void JobInfoCollector::addCallback(OnFinish cb) {
     finishCallbacks_.push_back(std::move(cb));
 }
 
-void JobInfoCollector::addJob(const Job& job) {
+void JobInfoCollector::addJob(Job job) {
     std::lock_guard lg(m_);
     currJobs_.push_back(job);
 }
@@ -53,13 +57,12 @@ void JobInfoCollector::start() {
                 std::lock_guard lg(m_);
                 auto name = std::get<0>(func_tuple);
                 auto func = std::get<1>(func_tuple);
-                for (const auto& job : currJobs_) {
-                    void* info = func(job);
-                    if(info){
-                        for (const auto& cb : finishCallbacks_) {
-                            cb(name, job, info, std::chrono::system_clock::now());
-                        }
+                for (auto& job : currJobs_) {
+                    auto info = func(job);
+                    for (const auto& cb : finishCallbacks_) {
+                        cb(name, job, std::move(info), std::chrono::system_clock::now());
                     }
+                    
                 }
             }
         );
@@ -100,10 +103,26 @@ void JobInfoCollector::string2Job(const std::string& str, Job& job) {
 
 void JobInfoCollector::registerCollectFuncs() {
     global_config = Config::instance();
-    auto func_names = global_config.getArray<std::string>("collector", "funcs");
-    for (const auto& name : func_names) {
-        if (name == "proc_collector") {
-            // 原实现为空
+    struct Collector {
+        std::string name;
+        std::string type;
+        std::string config;
+    };
+    auto collectors = global_config.getArray<Collector>("collector", "collectors",
+        [](const YAML::Node& node) {
+            Collector c;
+            c.name = node["name"].as<std::string>();
+            c.type = node["type"].as<std::string>();
+            c.config = node["config"].as<std::string>();
+            return c;
+        });
+    for (const auto& collector : collectors) {
+        if (collector.type == "proc_collector") {
+            auto t = std::make_tuple(
+                collector.name,
+                proc_collector::collect
+            );
+            collectFuncs_.emplace_back(std::move(t));
         }
     }
 }
