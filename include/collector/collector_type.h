@@ -3,6 +3,7 @@
 #include <vector>
 #include <chrono>
 #include <unordered_map>
+#include <functional>
 
 enum class CollectorType {
     ProcColletor,      // 采集 /proc/<pid>/stat
