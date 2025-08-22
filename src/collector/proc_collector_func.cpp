@@ -10,6 +10,8 @@
 
 #include "collector/collector_type.h"
 #include <any>
+#include <iostream>
+#include <fmt/chrono.h>
 
 namespace proc_collector {
 
@@ -148,6 +150,7 @@ std::unique_ptr<proc_info> snapshotOf(int pid) {
 
 std::any collect(Job& job) {
     std::vector<std::shared_ptr<proc_info>> infos;
+    auto time_start = std::chrono::system_clock::now();
     for (int pid : job.JobPIDs) {
         if (pid <= 0) continue;
         auto info = snapshotOf(pid);
@@ -155,10 +158,10 @@ std::any collect(Job& job) {
         job.JobInfo[fmt::format("proc_info_{}", pid)] = info.get();
         infos.emplace_back(std::move(info));
     }
-    
+    // std::cout<< fmt::format("use time {:%Q ms}",(std::chrono::system_clock::now() - time_start)) << std::endl;
     std::any a = std::move(infos); 
 
     return a;
 }
 
-} 
+}

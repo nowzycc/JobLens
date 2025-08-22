@@ -55,7 +55,7 @@ void JobInfoCollector::start() {
     for (const auto& func_tuple: collectFuncs_) {
         auto config = std::get<1>(func_tuple);
         timerScheduler_.registerRepeatingTimer(
-            std::chrono::milliseconds(global_config.getInt(config, "freq")),
+            std::chrono::milliseconds(int(1000/global_config.getInt(config, "freq"))),
             [this, func_tuple]() {
                 std::lock_guard lg(m_);
                 auto name = std::get<0>(func_tuple);
