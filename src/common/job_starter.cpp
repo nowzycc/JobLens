@@ -75,7 +75,6 @@ void JobStarter::worker(int pid,
     do {
         ret = waitpid(pid, &status, 0);
     } while (ret == -1 && errno == EINTR);
-    
 
     int exit_code = 0;
     if (WIFEXITED(status))
@@ -86,7 +85,10 @@ void JobStarter::worker(int pid,
         exit_code = -1;
 
     // 细节 5：回调一定在主线程之外执行，避免阻塞
-    if (cb) cb(pid, exit_code);
+    std::thread cb_thread([cb, pid, exit_code]() {
+        if (cb) cb(pid, exit_code);
+    });
+    cb_thread.detach(); // 分离线程，避免阻塞主线程
 }
 
 // ------------------------------------------------------------------

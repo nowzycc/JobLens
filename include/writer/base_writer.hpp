@@ -10,6 +10,8 @@
 #include <tuple>
 #include <vector>
 
+#include <spdlog/spdlog.h>
+
 #include "collector/collector_type.h"
 #include "common/config.hpp"
 #include "utils/nlohmann/json.hpp"
@@ -27,6 +29,16 @@ class base_writer
 public:
     explicit base_writer(std::size_t buf_cap = 4096);
     virtual ~base_writer();
+
+    void shutdown() {
+        std::lock_guard lg(mtx_);
+        stop_ = true;
+        cv_.notify_one();
+        spdlog::info("base_writer: shutting down...");
+        if (flush_thread_.joinable())
+            spdlog::info("base_writer: waiting for flush worker to finish...");
+            flush_thread_.join();
+    }
 
     void on_finish(std::string collect_name,
                    const Job& job,

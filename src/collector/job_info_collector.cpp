@@ -20,16 +20,15 @@ JobInfoCollector::JobInfoCollector()
 
     registerCollectFuncs();
     registerFinishCallbacks();
-    std::cout<<"registerFinishCallbacks done"<<std::endl;
     spdlog::info("JobInfoCollector: initialized with {} collect functions and {} finish callbacks",
                 collectFuncs_.size(), finishCallbacks_.size());
 }
 
 JobInfoCollector::~JobInfoCollector() { shutdown(); }
 
-void JobInfoCollector::addCollectFunc(std::string name, std::function<std::any(Job&)> f) {
+void JobInfoCollector::addCollectFunc(std::string name, std::string config, std::function<std::any(Job&)> f) {
     std::lock_guard lg(m_);
-    collectFuncs_.push_back(std::make_tuple(std::move(name), std::move(f)));
+    collectFuncs_.push_back(std::make_tuple(name, config, std::move(f)));
 }
 
 void JobInfoCollector::addCallback(OnFinish cb) {
@@ -54,13 +53,13 @@ void JobInfoCollector::start() {
     if (running_) return;
     running_ = true;
     for (const auto& func_tuple: collectFuncs_) {
-        auto name = std::get<0>(func_tuple);
+        auto config = std::get<1>(func_tuple);
         timerScheduler_.registerRepeatingTimer(
-            std::chrono::milliseconds(global_config.getInt(name, "freq")),
+            std::chrono::milliseconds(global_config.getInt(config, "freq")),
             [this, func_tuple]() {
                 std::lock_guard lg(m_);
                 auto name = std::get<0>(func_tuple);
-                auto func = std::get<1>(func_tuple);
+                auto func = std::get<2>(func_tuple);
                 for (auto& job : currJobs_) {
                     auto info = func(job);
                     for (const auto& cb : finishCallbacks_) {
@@ -79,9 +78,9 @@ void JobInfoCollector::shutdown() {
         if (!running_) return;
         running_ = false;
     }
-    cv_.notify_all();
-    for (auto& t : threads_) if (t.joinable()) t.join();
-    threads_.clear();
+    timerScheduler_.shutdown();
+    writer_manager::instance().shutdown();
+    spdlog::info("JobInfoCollector: writer_manager shutdown complete");
 }
 
 nlohmann::json JobInfoCollector::snapshot() {
@@ -124,18 +123,18 @@ void JobInfoCollector::registerCollectFuncs() {
 
     for (const auto& collector : collectors) {
         if (collector.type == COLLECTOR_TYPE_PROC) {
-            auto t = std::make_tuple(
+            addCollectFunc(
                 collector.name,
+                collector.config,
                 proc_collector::collect
             );
-            collectFuncs_.emplace_back(std::move(t));
         }
     }
 }
 
 void JobInfoCollector::registerFinishCallbacks() {
     auto callbacks = writer_manager::instance().get_onFinishCallbacks();
-    std::lock_guard lg(m_);
+    
     for (const auto& cb_func : callbacks) {
         addCallback(cb_func);
     }

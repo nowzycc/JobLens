@@ -19,6 +19,9 @@ private:
 public:
     writer_manager();
     ~writer_manager();
+    
+    void shutdown();
+
     std::vector<OnFinish> get_onFinishCallbacks();
 
     static writer_manager& instance();

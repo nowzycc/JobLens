@@ -46,6 +46,15 @@ writer_manager::~writer_manager() {
     writers_.clear();
 }
 
+void writer_manager::shutdown() {
+    std::lock_guard lg(m_);
+    spdlog::info("writer_manager: shutting down...");
+    for (auto& writer : writers_) {
+        writer->shutdown();
+    }
+    writers_.clear();
+}
+
 std::vector<OnFinish> writer_manager::get_onFinishCallbacks() {
     std::lock_guard lg(m_);
     std::vector<OnFinish> callbacks;

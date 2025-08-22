@@ -73,6 +73,7 @@ void base_writer::flush_worker()
     {
         cv_.wait(lk, [this] { return stop_ || need_flush_; });
         if (stop_)
+            spdlog::info("base_writer: flush worker stopping...");
             break;
 
         front_.swap(back_);

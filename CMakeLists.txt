@@ -87,7 +87,6 @@ target_include_directories(JobLens
 
 # ----------------------------------------------
 # 8. 链接系统库
-#    例如 pthread、libbpf 等
 # ----------------------------------------------
 target_link_libraries(JobLens
     PRIVATE

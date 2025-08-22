@@ -1,5 +1,6 @@
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LOGGER_TRACE
 #include <iostream>
+#include <thread>
 #include <spdlog/spdlog.h>
 
 #include "utils/cxxopts.hpp"
@@ -13,8 +14,11 @@
 
 void onExitCallback(int pid, int exit_code) {
     JobInfoCollector::instance().shutdown();
+    spdlog::info("Main: JobInfoCollector shutdown");
     DistributedNode::instance().stop();
-    std::cout << "Job with PID " << pid << " exited with code " << exit_code << std::endl;
+    JobStarter::instance().shutdown();
+    spdlog::info("Main: DistributedNode shutdown");
+    spdlog::info("Main: Job with PID {} exited with code {}", pid, exit_code);
     exit(exit_code);
 }
 
@@ -31,7 +35,7 @@ void onBecomeMaster() {
             .JobCreateTime = std::chrono::system_clock::now()
         });
 
-        permission_opt::check_permission();
+        // permission_opt::check_permission();
 
         JobInfoCollector::instance().start();
     }
@@ -72,6 +76,10 @@ void init() {
     spdlog::set_level(spdlog::level::info); // 设置日志级别
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%l] %v"); // 设置日志格式
     print_logo();
+}
+
+void get_main_mtx(){
+
 }
 
 int main(int argc, char* argv[]) {
@@ -115,5 +123,10 @@ int main(int argc, char* argv[]) {
 
     DistributedNode::instance().start();
 
-    return 0;
+
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::unique_lock<std::mutex> lock(mtx);
+    cv.wait(lock, [] { return false; }); 
+    return 0; // 永远不会到达这里
 }

@@ -23,6 +23,20 @@ TimerScheduler::~TimerScheduler() {
     }
 }
 
+void TimerScheduler::shutdown() {
+    stop = true;
+    cv.notify_all();
+    schedulerCv.notify_all();
+    for (auto& worker : workers) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
+    if (schedulerThread.joinable()) {
+        schedulerThread.join();
+    }
+}
+
 size_t TimerScheduler::registerTimer(Duration delay, Task task) {
     return addTask(std::move(task), delay, false);
 }

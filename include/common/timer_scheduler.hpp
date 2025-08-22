@@ -33,6 +33,8 @@ public:
     explicit TimerScheduler(size_t numWorkers = 1);
     ~TimerScheduler();
 
+    void shutdown();
+
     // 注册单次定时任务
     size_t registerTimer(Duration delay, Task task);
 

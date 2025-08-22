@@ -13,15 +13,15 @@ writers_config:
 collectors_config:
   job_adder_fifo: /tmp/JobLens/job_adder_fifo
   collectors:
-    - name: job_info_collector
-      type: job_info
-      config: job_info_collector_config
+    - name: proc_collector
+      type: ProcCollector
+      config: proc_collector_config
 
 base_writer_config:
   write_timeout: 5
 
-job_info_collector_config:
-
+proc_collector_config:
+  freq: 1
 
 file_writer_config:
   path: /tmp/joblens_test
