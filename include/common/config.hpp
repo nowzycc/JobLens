@@ -1,5 +1,6 @@
 #pragma once
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LOGGER_TRACE
+
 #include <yaml-cpp/yaml.h>
 #include <spdlog/spdlog.h>
 #include <string>

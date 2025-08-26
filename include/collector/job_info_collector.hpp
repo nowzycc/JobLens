@@ -1,4 +1,6 @@
 #pragma once
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LOGGER_TRACE
+
 #include <chrono>
 #include <functional>
 #include <mutex>

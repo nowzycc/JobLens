@@ -1,5 +1,7 @@
 // elasticsearch_writer.h
 #pragma once
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LOGGER_TRACE
+
 #include "writer/base_writer.hpp"
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>

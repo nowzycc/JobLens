@@ -1,4 +1,6 @@
 #pragma once
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LOGGER_TRACE
+
 #include <fstream>
 #include <string>
 #include <vector>
