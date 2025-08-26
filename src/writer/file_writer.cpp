@@ -1,7 +1,10 @@
 #include "writer/file_writer.hpp"
 
-FileWriter::FileWriter(const std::string& path)
-    : base_writer(8192), ofs_(path) {}
+FileWriter::FileWriter(std::string name, std::string type, std::string config_name)
+    : base_writer(name,type,config_name) {
+        auto file_path = Config::instance().getString(config_name, "path");
+        ofs_.open(file_path, std::ios::app);
+    }
 
 void FileWriter::flush_impl(const std::vector<write_data>& batch) {
     for (const auto& j : batch) {

@@ -6,7 +6,7 @@
 
 class FileWriter : public base_writer {
 public:
-    explicit FileWriter(const std::string& path);
+    explicit FileWriter(std::string name, std::string type, std::string config_name);
 
 protected:
     void flush_impl(const std::vector<write_data>& batch) override;

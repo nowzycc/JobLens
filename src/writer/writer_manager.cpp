@@ -8,6 +8,7 @@
 #include <fmt/core.h>
 
 const char* WRITER_TYPE_FILE = "FileWriter";
+const char* WRITER_TYPE_ES   = "ESWriter";
 
 writer_manager::writer_manager() {
     struct Writer{
@@ -31,10 +32,13 @@ writer_manager::writer_manager() {
         auto name = writer.name;
         auto config = writer.config;
         if (writer_type == WRITER_TYPE_FILE) {
-            auto path = global_config.getString(config, "path");
-            auto writer_handle = std::make_unique<FileWriter>(path);
+            auto writer_handle = std::make_unique<FileWriter>(name, writer_type, config);
             addWriter(std::move(writer_handle));
-        } else {
+        }else if (writer_type == WRITER_TYPE_ES) {
+            auto writer_handle = std::make_unique<ESWriter>(name, writer_type, config);
+            addWriter(std::move(writer_handle));
+        }
+         else {
             throw std::runtime_error(fmt::format("Unknown writer type: {}", writer_type));
         }
     }

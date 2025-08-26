@@ -12,10 +12,13 @@ struct base_writer::Buffer
 };
 
 // -------------------- 构造 / 析构 --------------------
-base_writer::base_writer(std::size_t buf_cap)
-    : buf_capacity_(buf_cap),
-      front_(std::make_unique<Buffer>(buf_cap)),
-      back_(std::make_unique<Buffer>(buf_cap)),
+base_writer::base_writer(std::string name, std::string type, std::string config_name)
+    : name_(std::move(name)),
+      type_(std::move(type)),
+      config_name_(std::move(config_name)),
+      buf_capacity_(Config::instance().getInt("writers_config", "buffer_capacity")),
+      front_(std::make_unique<Buffer>(buf_capacity_)),
+      back_(std::make_unique<Buffer>(buf_capacity_)),
       flush_thread_(&base_writer::flush_worker, this)
 {
 }

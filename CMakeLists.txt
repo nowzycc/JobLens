@@ -42,6 +42,9 @@ fetch_if_missing(yaml-cpp https://github.com/jbeder/yaml-cpp.git)
 find_package(date QUIET)
 fetch_if_missing(date https://github.com/HowardHinnant/date.git)
 
+find_package(PkgConfig  REQUIRED)
+pkg_check_modules(CURL REQUIRED IMPORTED_TARGET libcurl)
+
 # ----------------------------------------------
 # 3. 变量：把路径集中定义，方便后续修改
 # ----------------------------------------------
@@ -83,6 +86,7 @@ target_include_directories(JobLens
         spdlog::spdlog
         date::date
         yaml-cpp::yaml-cpp
+        PkgConfig::CURL
 )
 
 # ----------------------------------------------
@@ -94,8 +98,7 @@ target_link_libraries(JobLens
         spdlog::spdlog
         date::date
         yaml-cpp::yaml-cpp
-        # 示例：如果使用 libbpf
-        # ${LIBBPF_LIBRARIES}
+        PkgConfig::CURL
 )
 
 # ----------------------------------------------

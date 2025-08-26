@@ -5,6 +5,7 @@ lens_config:
   max_collector_threads: 4
 
 writers_config:
+  buffer_capacity: 4096
   writers:
     - name: file_writer
       type: FileWriter
@@ -20,8 +21,17 @@ collectors_config:
 base_writer_config:
   write_timeout: 5
 
+ES_writer_config:
+  host: localhost
+  port: 9200
+  batch_size: 500
+  indexs:
+   - collector_name: proc_collector
+     index_name: joblens_proc
+
 proc_collector_config:
   freq: 1
+
 
 file_writer_config:
   path: /tmp/joblens_test

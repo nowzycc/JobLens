@@ -27,7 +27,7 @@ using write_data = std::tuple<std::string,
 class base_writer
 {
 public:
-    explicit base_writer(std::size_t buf_cap = 4096);
+    explicit base_writer(std::string name, std::string type, std::string config_name);
     virtual ~base_writer();
 
     void shutdown() {
@@ -49,15 +49,16 @@ public:
 
 protected:
     virtual void flush_impl(const std::vector<write_data>& batch);
+    void write(const write_data& t);
 
 private:
     struct Buffer;
 
-    void write(const write_data& t);
+    
     void flush_worker();
     void flush_buffer(Buffer& buf);
     void trigger_async_flush();
-
+    
     const std::size_t buf_capacity_;
     std::unique_ptr<Buffer> front_;
     std::unique_ptr<Buffer> back_;
@@ -68,6 +69,7 @@ private:
     bool stop_ = false;
     bool need_flush_ = false;
 
-    std::string name_ = "base";
+    std::string name_;
     std::string type_;
+    std::string config_name_;
 };

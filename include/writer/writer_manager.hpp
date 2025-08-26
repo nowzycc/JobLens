@@ -5,6 +5,7 @@
 #include <functional>
 
 #include "writer/file_writer.hpp"
+#include "writer/es_writer.hpp"
 
 // 前置声明，避免不必要的头文件依赖
 class base_writer;
