@@ -119,6 +119,7 @@ json try_parse_data(const std::string& collector_name, const std::any& data, jso
             spdlog::error("elasticsearch_writer: bad_any_cast for collector '{}': {}", collector_name, e.what());
         }
     }
+    return out;
 }
 
 /* ---------- 真正写 ES ---------- */

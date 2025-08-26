@@ -36,6 +36,7 @@ namespace collector_utils
         if (it != name_to_type.end()) {
             return it->second;
         }
+        return "unknown";
     }
 
     static std::string get_hostname()
