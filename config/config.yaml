@@ -7,9 +7,9 @@ lens_config:
 writers_config:
   buffer_capacity: 4096
   writers:
-    - name: file_writer
-      type: FileWriter
-      config: file_writer_config
+    - name: es_writer
+      type: ESWriter
+      config: ES_writer_config
 
 collectors_config:
   job_adder_fifo: /tmp/JobLens/job_adder_fifo
@@ -22,9 +22,10 @@ base_writer_config:
   write_timeout: 5
 
 ES_writer_config:
-  host: localhost
+  host: 192.168.51.85
   port: 9200
-  batch_size: 500
+  batch_size: 1
+  write_timeout: 5
   indexs:
    - collector_name: proc_collector
      index_name: joblens_proc

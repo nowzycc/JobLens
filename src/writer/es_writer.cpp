@@ -10,6 +10,8 @@
 
 using json = nlohmann::json;
 
+static size_t discard_cb(char*, size_t size, size_t n, void*) { return size * n; }
+
 /* ---------- 构造/析构 ---------- */
 ESWriter::ESWriter(std::string name, std::string type, std::string config_name)
     : base_writer(name,type,config_name)
@@ -17,6 +19,7 @@ ESWriter::ESWriter(std::string name, std::string type, std::string config_name)
     opt_.batch_size = Config::instance().getInt(config_name, "batch_size");
     opt_.host = Config::instance().getString(config_name, "host");
     opt_.port = Config::instance().getInt(config_name, "port");
+    write_timeout = Config::instance().getInt(config_name, "write_timeout");
     try
     {
         opt_.index_prefix = Config::instance().getString(config_name, "index_prefix");
@@ -26,20 +29,55 @@ ESWriter::ESWriter(std::string name, std::string type, std::string config_name)
         opt_.index_prefix = "collector";
         spdlog::warn("elasticsearch_writer: no index_prefix configured, using default 'collector'");
     }
-
-    spdlog::info("elasticsearch_writer: initialized with host={} port={} index_prefix='{}' batch_size={}",
-                 opt_.host, opt_.port, opt_.index_prefix, opt_.batch_size);
-
+    spdlog::debug("elasticsearch_writer: initializing curl...");
     curl_global_init(CURL_GLOBAL_ALL);
+    spdlog::debug("elasticsearch_writer: curl_global_init done");
     curl_ = curl_easy_init();
     if (!curl_) throw std::runtime_error("curl_easy_init failed");
+    if (!test_server()) {
+        throw std::runtime_error("Failed to connect to Elasticsearch server at " +
+                                 opt_.host + ":" + std::to_string(opt_.port));
+    }
     local_buf_.reserve(opt_.batch_size);
+    spdlog::info("elasticsearch_writer: initialized with host={} port={} index_prefix='{}' batch_size={}",
+                 opt_.host, opt_.port, opt_.index_prefix, opt_.batch_size);
 }
 
 ESWriter::~ESWriter()
 {
     if (curl_) curl_easy_cleanup(curl_);
     curl_global_cleanup();
+}
+
+bool ESWriter::test_server()
+{
+    if (!curl_) return false;
+
+    const std::string url =
+        fmt::format("http://{}:{}/", opt_.host, opt_.port);
+    spdlog::debug("elasticsearch_writer: testing connection to {}", url);
+    curl_easy_reset(curl_);
+    curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl_, CURLOPT_NOBODY, 1L); // HEAD 请求
+    curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, discard_cb); // 丢弃响应体
+    curl_easy_setopt(curl_, CURLOPT_TIMEOUT, write_timeout); // 设置超时
+
+    CURLcode res = curl_easy_perform(curl_);
+    
+    if (res != CURLE_OK) {
+        spdlog::error("elasticsearch_writer: curl_easy_perform() failed: {}", curl_easy_strerror(res));
+        return false;
+    }
+
+    long response_code = 0;
+    curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &response_code);
+    if (response_code != 200) {
+        spdlog::error("elasticsearch_writer: server responded with code {}", response_code);
+        return false;
+    }
+
+    spdlog::info("elasticsearch_writer: successfully connected to Elasticsearch at {}:{}", opt_.host, opt_.port);
+    return true;
 }
 
 /* ---------- 子类缓冲 ---------- */
@@ -155,7 +193,7 @@ void ESWriter::flush_impl(const std::vector<write_data>& batch)
 }
 
 /* ---------- libcurl POST ---------- */
-static size_t discard_cb(char*, size_t size, size_t n, void*) { return size * n; }
+
 
 bool ESWriter::post_bulk(const std::string& bulk)
 {
@@ -168,6 +206,7 @@ bool ESWriter::post_bulk(const std::string& bulk)
     curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, bulk.c_str());
     curl_easy_setopt(curl_, CURLOPT_POSTFIELDSIZE, bulk.size());
+    curl_easy_setopt(curl_, CURLOPT_TIMEOUT, write_timeout); // 设置超时
 
     struct curl_slist* hdrs = nullptr;
     hdrs = curl_slist_append(hdrs, "Content-Type: application/json");

@@ -31,6 +31,7 @@ writer_manager::writer_manager() {
         auto writer_type = writer.type;
         auto name = writer.name;
         auto config = writer.config;
+        spdlog::debug("writer_manager: adding writer: name='{}', type='{}', config='{}'", name, writer_type, config);
         if (writer_type == WRITER_TYPE_FILE) {
             auto writer_handle = std::make_unique<FileWriter>(name, writer_type, config);
             addWriter(std::move(writer_handle));

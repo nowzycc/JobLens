@@ -73,7 +73,7 @@ void print_logo(){
 
 void init() {
     // 初始化日志系统
-    spdlog::set_level(spdlog::level::info); // 设置日志级别
+    spdlog::set_level(spdlog::level::debug); // 设置日志级别
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%l] %v"); // 设置日志格式
     print_logo();
 }

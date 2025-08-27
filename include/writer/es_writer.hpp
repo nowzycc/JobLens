@@ -29,7 +29,8 @@ public:
 
 private:
     bool post_bulk(const std::string& bulk_body);
-
+    bool test_server();
+    int write_timeout;
     options opt_;
     std::vector<write_data> local_buf_;   // 子类私有缓冲
     std::mutex local_mtx_;                // 保护 local_buf_
