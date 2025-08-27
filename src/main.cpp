@@ -73,7 +73,22 @@ void print_logo(){
 
 void init() {
     // 初始化日志系统
-    spdlog::set_level(spdlog::level::debug); // 设置日志级别
+    const static auto log_level_map = std::map<std::string, spdlog::level::level_enum>{
+        {"trace", spdlog::level::trace},
+        {"debug", spdlog::level::debug},
+        {"info", spdlog::level::info},
+        {"warn", spdlog::level::warn},
+        {"error", spdlog::level::err},
+        {"critical", spdlog::level::critical},
+        {"off", spdlog::level::off}
+    };
+    auto log_level = Config::instance().getString("lens_config", "log_level");
+    auto it = log_level_map.find(log_level);
+    if (it == log_level_map.end()) {
+        log_level = "info"; // 默认 info 级别
+    }
+    auto level_enum = log_level_map.at(log_level);
+    spdlog::set_level(level_enum); // 设置日志级别
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%l] %v"); // 设置日志格式
     print_logo();
 }
@@ -83,7 +98,6 @@ void get_main_mtx(){
 }
 
 int main(int argc, char* argv[]) {
-    init();
     cxxopts::Options options("JobLens", "A job monitor system");
     options.add_options()
         ("h,help", "Show help")
@@ -104,6 +118,8 @@ int main(int argc, char* argv[]) {
     
     Config::instance(result["config"].as<std::string>());
     
+    init();
+
     DistributedNode::instance().set_become_master_callback(onBecomeMaster);
 
     DistributedNode::instance().set_become_slave_callback(onBecomeSlave);
