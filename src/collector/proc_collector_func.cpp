@@ -158,9 +158,7 @@ std::any collect(Job& job) {
         job.JobInfo[fmt::format("proc_info_{}", pid)] = info.get();
         infos.emplace_back(std::move(info));
     }
-    // std::cout<< fmt::format("use time {:%Q ms}",(std::chrono::system_clock::now() - time_start)) << std::endl;
     std::any a = std::move(infos); 
-
     return a;
 }
 

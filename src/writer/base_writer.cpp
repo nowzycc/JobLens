@@ -42,6 +42,7 @@ void base_writer::on_finish(std::string collect_name,
                             const std::any data,
                             std::chrono::system_clock::time_point ts)
 {
+    spdlog::debug("base_writer: on_finish called for writer '{}', collector '{}'", name_, collect_name);
     auto t = std::make_tuple(std::move(collect_name), job, data, ts);
     write(t);
     trigger_async_flush();
@@ -64,6 +65,7 @@ void base_writer::flush_impl(const std::vector<write_data>&)
 
 void base_writer::write(const write_data& t)
 {
+    spdlog::debug("base_writer: write called for writer '{}', collector '{}'", name_, std::get<0>(t));
     front_->push_back(t);
     if (front_->size() >= buf_capacity_)
         trigger_async_flush();
@@ -75,9 +77,11 @@ void base_writer::flush_worker()
     for (;;)
     {
         cv_.wait(lk, [this] { return stop_ || need_flush_; });
-        if (stop_)
+        spdlog::debug("base_writer: flush worker woke up for writer '{}'", name_);
+        if (stop_){
             spdlog::info("base_writer: flush worker stopping...");
             break;
+        }
 
         front_.swap(back_);
         need_flush_ = false;
@@ -92,7 +96,11 @@ void base_writer::flush_worker()
 void base_writer::flush_buffer(Buffer& buf)
 {
     if (!buf.vec.empty())
+    {
+        spdlog::debug("base_writer: flushing {} items for writer '{}'", buf.vec.size(), name_);
         flush_impl(buf.vec);
+    }
+        
 }
 
 void base_writer::trigger_async_flush()

@@ -3,6 +3,7 @@ lens_config:
   lock_path: /tmp/JobLens/JobLens.lock
   pid_dir: /tmp/JobLens/node_pids
   max_collector_threads: 4
+  log_level: debug
 
 writers_config:
   buffer_capacity: 4096
@@ -25,7 +26,7 @@ ES_writer_config:
   host: 192.168.51.85
   port: 9200
   batch_size: 1
-  write_timeout: 5
+  write_timeout: 1
   indexs:
    - collector_name: proc_collector
      index_name: joblens_proc

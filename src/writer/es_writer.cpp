@@ -84,6 +84,7 @@ bool ESWriter::test_server()
 void ESWriter::write(const write_data& w)
 {
     std::lock_guard lg(local_mtx_);
+    spdlog::debug("elasticsearch_writer: write called for collector '{}'", std::get<0>(w));
     local_buf_.push_back(w);
 
     if (local_buf_.size() >= opt_.batch_size)
@@ -99,7 +100,7 @@ void ESWriter::write(const write_data& w)
     }
 }
 
-std::string try_get_index_name(const write_data& w)
+std::string ESWriter::try_get_index_name(const write_data& w)
 {
     static std::string last_index_name = "default";
     static std::string last_collector_name = "";
@@ -112,7 +113,7 @@ std::string try_get_index_name(const write_data& w)
         std::string index_name;
     };
     static const auto config_indexs = Config::instance().getArray<es_index_config>(
-        "elasticsearch_config", "indexs",
+        config_name_, "indexs",
         [](const YAML::Node& node) {
             es_index_config c;
             c.collector_name = node["collector_name"].as<std::string>();
@@ -129,11 +130,15 @@ std::string try_get_index_name(const write_data& w)
     return "default";
 }
 
-json try_parse_data(const std::string& collector_name, const std::any& data, json& out)
+bool ESWriter::try_parse_data(const std::string& collector_name, const std::any& data, json& out)
 {
     auto type = collector_utils::get_type_from_name(collector_name);
-    if (type == "ProcColletor") {
+    if (type.compare(COLLECTOR_TYPE_PROC) == 0) {
         try {
+            if(data.has_value() == false) {
+                spdlog::warn("elasticsearch_writer: empty data for collector '{}'", collector_name);
+                return false;
+            }
             auto parsed = std::any_cast<std::vector<std::shared_ptr<proc_collector::proc_info>>>(data);
             for (const auto& info : parsed) {
                 json j;
@@ -151,13 +156,13 @@ json try_parse_data(const std::string& collector_name, const std::any& data, jso
                 j["status"] = info->status;
                 out.push_back(j);
             }
-            return out;
+            return true;
         }
         catch (const std::bad_any_cast& e) {
             spdlog::error("elasticsearch_writer: bad_any_cast for collector '{}': {}", collector_name, e.what());
         }
     }
-    return out;
+    return false;
 }
 
 /* ---------- 真正写 ES ---------- */
@@ -181,8 +186,11 @@ void ESWriter::flush_impl(const std::vector<write_data>& batch)
         json src;
         src["@timestamp"] = date::format("%FT%T%z", date::floor<std::chrono::seconds>(ts));
         src["collector_name"] = collect_name;
-        src['hostname'] = collector_utils::get_hostname();
-        try_parse_data(collect_name, any_data, src);
+        src["hostname"] = collector_utils::get_hostname();
+        json jobj;
+        try_parse_data(collect_name, any_data, jobj);
+        spdlog::debug("elasticsearch_writer: document to index: {}", jobj.dump());
+        src["data"] = jobj;
         body << src.dump() << '\n';
     }
 

@@ -6,8 +6,10 @@
 #include <functional>
 #include <any>
 
+#define COLLECTOR_TYPE_PROC "ProcCollector"
+
 enum class CollectorType {
-    ProcColletor,      // 采集 /proc/<pid>/stat
+    ProcCollector,      // 采集 /proc/<pid>/stat
     kStatus,    // 采集 /proc/<pid>/status
     kCmdline,   // 采集 /proc/<pid>/cmdline
     kFd         // 采集 /proc/<pid>/fd 信息

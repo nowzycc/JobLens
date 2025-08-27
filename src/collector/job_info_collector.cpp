@@ -4,8 +4,6 @@
 
 #include <iostream>
 
-const char* COLLECTOR_TYPE_PROC = "ProcCollector";
-
 JobInfoCollector::JobInfoCollector()
 {
     job_adder_.emplace(StreamWatcher::Config{
@@ -63,6 +61,7 @@ void JobInfoCollector::start() {
                 for (auto& job : currJobs_) {
                     auto info = func(job);
                     for (const auto& cb : finishCallbacks_) {
+                        spdlog::debug("JobInfoCollector: invoking callback for collector '{}', job ID {}", name, job.JobID);
                         cb(name, job, std::move(info), std::chrono::system_clock::now());
                     }
                     

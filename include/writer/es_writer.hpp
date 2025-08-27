@@ -30,6 +30,8 @@ public:
 private:
     bool post_bulk(const std::string& bulk_body);
     bool test_server();
+    std::string try_get_index_name(const write_data& w);
+    bool try_parse_data(const std::string& collector_name, const std::any& data, nlohmann::json& out);
     int write_timeout;
     options opt_;
     std::vector<write_data> local_buf_;   // 子类私有缓冲

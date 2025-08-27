@@ -19,7 +19,7 @@ class Job;
 namespace proc_collector {
 
 struct proc_info {
-    int8_t      type{int8_t(CollectorType::ProcColletor)};
+    int8_t      type{int8_t(CollectorType::ProcCollector)};
     int         pid{};
     std::string name;
     int         ppid{};

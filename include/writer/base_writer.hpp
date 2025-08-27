@@ -52,6 +52,9 @@ public:
 protected:
     virtual void flush_impl(const std::vector<write_data>& batch);
     void write(const write_data& t);
+    std::string name_;
+    std::string type_;
+    std::string config_name_;
 
 private:
     struct Buffer;
@@ -71,7 +74,4 @@ private:
     bool stop_ = false;
     bool need_flush_ = false;
 
-    std::string name_;
-    std::string type_;
-    std::string config_name_;
 };
