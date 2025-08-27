@@ -97,10 +97,27 @@ void JobInfoCollector::string2Job(const std::string& str, Job& job) {
     nlohmann::json j = nlohmann::json::parse(str);
     job.JobID = j["JobID"].get<int>();
     job.JobPIDs = j["JobPIDs"].get<std::vector<int>>();
+    if (job.JobPIDs.size() == 0) {
+        spdlog::warn("JobInfoCollector: job ID {} has empty PID list", job.JobID);
+    }
+    for (auto pid: job.JobPIDs) {
+        if (pid > 0) {
+            spdlog::warn("JobInfoCollector: invalid PID {} in job ID {}", pid, job.JobID);
+        }
+    }
     date::sys_seconds tp;
     std::istringstream in{j["JobCreateTime"].get<std::string>()};
-    in >> date::parse("%F %T", tp);
-    job.JobCreateTime = tp;
+    try
+    {
+        in >> date::parse("%F %T", tp);
+        job.JobCreateTime = tp;
+    }
+    catch(const std::exception& e)
+    {
+        spdlog::error("JobInfoCollector: error parsing JobCreateTime for job ID {}: {}", job.JobID, e.what());
+        job.JobCreateTime = std::chrono::system_clock::now();
+    }
+    
 }
 
 void JobInfoCollector::registerCollectFuncs() {
