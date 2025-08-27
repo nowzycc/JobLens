@@ -33,13 +33,20 @@ public:
     virtual ~base_writer();
 
     void shutdown() {
-        std::lock_guard lg(mtx_);
-        stop_ = true;
+        {
+            std::lock_guard lg(mtx_);
+            stop_ = true;
+            need_flush_ = false;
+        }
+        
         cv_.notify_one();
         spdlog::info("base_writer: shutting down...");
-        if (flush_thread_.joinable())
+        if (flush_thread_.joinable()){
             spdlog::info("base_writer: waiting for flush worker to finish...");
             flush_thread_.join();
+        }
+        flush_buffer(*front_);
+        spdlog::info("base_writer: shutdown complete for writer '{}'", name_);
     }
 
     void on_finish(std::string collect_name,

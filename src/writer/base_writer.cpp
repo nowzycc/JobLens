@@ -74,7 +74,7 @@ void base_writer::write(const write_data& t)
 void base_writer::flush_worker()
 {
     std::unique_lock<std::mutex> lk(mtx_);
-    for (;;)
+    while (stop_ == false)
     {
         cv_.wait(lk, [this] { return stop_ || need_flush_; });
         spdlog::debug("base_writer: flush worker woke up for writer '{}'", name_);
