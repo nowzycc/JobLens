@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
     options.add_options()
         ("h,help", "Show help")
         ("c,config", "Configuration file path", cxxopts::value<std::string>()->default_value("config.yaml"))
-        ("m,monitor", "Monitor mode (default: true)", cxxopts::value<bool>()->default_value("true"))
+        ("m,mode", "run mode (default: starter)", cxxopts::value<bool>()->default_value("starter"))
         ("e,exec", "Executable to run", cxxopts::value<std::string>())
         ("a,args", "Arguments for the executable", cxxopts::value<std::vector<std::string>>()->default_value(""));
     
@@ -115,31 +115,39 @@ int main(int argc, char* argv[]) {
         std::cout << options.help() << std::endl;
         return 0;
     }
-    
+    auto mode = result["mode"].as<std::string>();
+    std::transform(mode.begin(), mode.end(), mode.begin(), ::tolower);
     Config::instance(result["config"].as<std::string>());
-    
+
     init();
 
-    DistributedNode::instance().set_become_master_callback(onBecomeMaster);
+    if (mode.compare("starter")){
+        
 
-    DistributedNode::instance().set_become_slave_callback(onBecomeSlave);
+        DistributedNode::instance().set_become_master_callback(onBecomeMaster);
 
-    JobStarter::instance().setCallback(onExitCallback);
+        DistributedNode::instance().set_become_slave_callback(onBecomeSlave);
 
-    auto ret = JobStarter::instance().launch({
-        .exe = result["exec"].as<std::string>(),
-        .args = result["args"].as<std::vector<std::string>>(),
-        .timeout = std::chrono::milliseconds(5000) // 可选超时
-    });
-    
-    if (!ret) {
-        std::cerr << "Failed to launch job." << std::endl;
-        return 1;
+        JobStarter::instance().setCallback(onExitCallback);
+
+        auto ret = JobStarter::instance().launch({
+            .exe = result["exec"].as<std::string>(),
+            .args = result["args"].as<std::vector<std::string>>(),
+            .timeout = std::chrono::milliseconds(5000) // 可选超时
+        });
+        
+        if (!ret) {
+            std::cerr << "Failed to launch job." << std::endl;
+            return 1;
+        }
+
+        DistributedNode::instance().start();
     }
-
-    DistributedNode::instance().start();
-
-
+    
+    if (mode.compare("service")){
+        onBecomeMaster();
+    }
+    
     std::mutex mtx;
     std::condition_variable cv;
     std::unique_lock<std::mutex> lock(mtx);
