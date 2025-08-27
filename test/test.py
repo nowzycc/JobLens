@@ -5,6 +5,7 @@ from threading import Thread
 import yaml
 import json
 import time
+from flask import Flask, request, jsonify
 
 Joblens_path = "/home/nowzycc/code/JobLens_cpp/build/JobLens"
 Config_path = "/home/nowzycc/code/JobLens_cpp/config/config.yaml"
@@ -55,11 +56,57 @@ def add_job_test():
     t.start()
     time.sleep(2)  # 等待 Joblens 启动
     with open(job_adder_path, 'w') as f:
-        f.write(json.dump(correct_job_info))
+        f.write(json.dumps(correct_job_info))
         f.flush()
+        print("Wrote correct job info")
         time.sleep(1)
-        f.write(json.dump(err_job_info))
+        f.write(json.dumps(err_job_info))
         f.flush()
+        print("Wrote erroneous job info")
+
+Config_path = os.getenv("CONFIG_PATH", "config.yaml")   # 可按需修改
+
+def add_job(JobID, JobPIDs, CreateTime):
+    job_info = {
+        'JobID': JobID,
+        'JobPIDs': JobPIDs,
+        'JobCreateTime': CreateTime,
+    }
+    with open(Config_path) as cfg_file:
+        config = yaml.safe_load(cfg_file)
+
+    job_adder_path = config['collectors_config']['job_adder_fifo']
+    with open(job_adder_path, 'w') as f:
+        f.write(json.dumps(job_info))
+        f.flush()
+
+@app.route('/add_job', methods=['POST'])
+def api_add_job():
+    """
+    POST /add_job
+    Body(json):
+    {
+        "JobID": "abc123",
+        "JobPIDs": [1234, 5678],
+        "CreateTime": "2025-08-27 14:00:00"
+    }
+    """
+    data = request.get_json(force=True, silent=True) or {}
+    JobID = data.get('JobID')
+    JobPIDs = data.get('JobPIDs')
+    CreateTime = data.get('CreateTime')
+
+    # 简单校验
+    if JobID is None or JobPIDs is None or CreateTime is None:
+        return jsonify({'error': 'JobID, JobPIDs and CreateTime are required'}), 400
+
+    try:
+        add_job(JobID, JobPIDs, CreateTime)
+    except Exception as e:
+        # 记录日志可换成 logging
+        return jsonify({'error': str(e)}), 500
+
+    return jsonify({'status': 'ok'}), 200
 
 if __name__ == "__main__":
     add_job_test()
