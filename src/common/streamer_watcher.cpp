@@ -132,7 +132,6 @@ private:
                 return;
             }
         }
-
         // 普通数据可读
         char buf[4096];
         ssize_t n = read(ev.data.fd, buf, sizeof(buf));
@@ -143,6 +142,7 @@ private:
             }
             return;
         }
+        spdlog::debug("StreamWatcher: read {} bytes from fd {}", n, ev.data.fd);
         cb_(buf, static_cast<std::size_t>(n));
     }
 

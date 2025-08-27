@@ -15,6 +15,7 @@ JobInfoCollector::JobInfoCollector()
         string2Job(std::string(buf, len), job);
         addJob(job);
     });
+    job_adder_->start();
 
     registerCollectFuncs();
     registerFinishCallbacks();
@@ -36,6 +37,7 @@ void JobInfoCollector::addCallback(OnFinish cb) {
 
 void JobInfoCollector::addJob(Job job) {
     std::lock_guard lg(m_);
+    spdlog::info("JobInfoCollector: adding job ID {} with {} PIDs", job.JobID, job.JobPIDs.size());
     currJobs_.push_back(job);
 }
 
@@ -77,6 +79,7 @@ void JobInfoCollector::shutdown() {
         if (!running_) return;
         running_ = false;
     }
+    job_adder_->stop();
     timerScheduler_.shutdown();
     writer_manager::instance().shutdown();
     spdlog::info("JobInfoCollector: writer_manager shutdown complete");
@@ -105,17 +108,17 @@ void JobInfoCollector::string2Job(const std::string& str, Job& job) {
             spdlog::warn("JobInfoCollector: invalid PID {} in job ID {}", pid, job.JobID);
         }
     }
-    date::sys_seconds tp;
-    std::istringstream in{j["JobCreateTime"].get<std::string>()};
     try
     {
+        date::sys_seconds tp;
+        std::istringstream in{j["JobCreateTime"].get<std::string>()};
         in >> date::parse("%F %T", tp);
         job.JobCreateTime = tp;
     }
     catch(const std::exception& e)
     {
-        spdlog::error("JobInfoCollector: error parsing JobCreateTime for job ID {}: {}", job.JobID, e.what());
-        job.JobCreateTime = std::chrono::system_clock::now();
+        spdlog::warn("JobInfoCollector: error parsing JobCreateTime for job ID {}: {}", job.JobID, e.what());
+        // job.JobCreateTime = std::chrono::system_clock::now();
     }
     
 }
