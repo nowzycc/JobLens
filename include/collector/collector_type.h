@@ -19,7 +19,8 @@ struct Job {
     int                                     JobID{};
     std::vector<int>                        JobPIDs;
     std::chrono::system_clock::time_point   JobCreateTime{std::chrono::system_clock::now()};
-    std::unordered_map<std::string, void*> JobInfo; // 用 json 存任意值
+    std::unordered_map<std::string, void*> JobInfo;
+    
 };
 
 using OnFinish = std::function<void(const std::string, const Job&, const std::any, std::chrono::system_clock::time_point)>;

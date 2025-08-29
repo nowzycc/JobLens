@@ -11,6 +11,9 @@ writers_config:
     - name: es_writer
       type: ESWriter
       config: ES_writer_config
+    - name: prmxs_writer
+      type: prmxsWriter
+      config: ES_writer_config
 
 collectors_config:
   job_adder_fifo: /tmp/JobLens/job_adder_fifo

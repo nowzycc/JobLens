@@ -56,6 +56,11 @@ void onBecomeSlave() {
     }
 }
 
+void onBecomeService(){
+    spdlog::info("Main: app start as service mode.");
+    JobInfoCollector::instance().start();
+}
+
 void print_logo(){
     std::cout<< R"(    _____          __       __                                 
    |     \        |  \     |  \
@@ -143,9 +148,9 @@ int main(int argc, char* argv[]) {
 
         DistributedNode::instance().start();
     }
-    
+
     if (mode.compare("service")){
-        onBecomeMaster();
+        onBecomeService();
     }
     
     std::mutex mtx;

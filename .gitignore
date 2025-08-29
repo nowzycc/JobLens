@@ -111,3 +111,4 @@ dkms.conf
 
 # debug information files
 *.dwo
+test/test.py
