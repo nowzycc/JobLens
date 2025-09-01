@@ -1,0 +1,11 @@
+{
+    "opt": "add",
+
+    "JobID": 1,
+    "JobPIDs": 1,
+    "Lens": [
+        "ProcCollector"
+    ]
+        
+    
+}
