@@ -12,6 +12,7 @@
 #include <fmt/core.h>
 #include <memory>
 #include "collector/collector_type.h"
+#include "icollector.h"
 #include <any>
 // 前置声明，降低头文件耦合
 class Job;
@@ -41,5 +42,13 @@ std::unique_ptr<proc_info> snapshotOf(int pid);
 
 /* 根据 Job 对象采集所有目标进程 */
 std::any collect(Job& job);
+
+class ProcCollector : public ICollector {
+public:
+    bool init(const nlohmann::json& cfg) override;
+    CollectResult collect(const Job& job) override;
+    void deinit() noexcept override;
+};
+
 
 } // namespace proc_collector

@@ -9,9 +9,11 @@
 #include <vector>
 
 #include "collector/collector_type.h"
+#include "collector/collector_registry.hpp"
 #include <any>
 #include <iostream>
 #include <fmt/chrono.h>
+#include <spdlog/spdlog.h>
 
 namespace proc_collector {
 
@@ -160,6 +162,29 @@ std::any collect(Job& job) {
     }
     std::any a = std::move(infos); 
     return a;
+}
+
+namespace {
+    struct AutoReg {
+        AutoReg() {
+            CollectorRegistry::instance().registerCollector<ProcCollector>("proc");
+        }
+    };
+    static AutoReg _auto_reg;   // 关键：全局对象，构造函数在 main() 前执行
+}
+
+bool ProcCollector::init(const nlohmann::json& cfg) {
+    spdlog::info("ProcCollector init with config: {}", cfg.dump());
+    // 这里可以解析 cfg["interval"] 等
+    return true;
+}
+
+CollectResult ProcCollector::collect(const Job& job) {
+    return collect(job);   // 复用你原来的 collect() 逻辑
+}
+
+void ProcCollector::deinit() noexcept {
+    spdlog::info("ProcCollector deinit");
 }
 
 }

@@ -24,3 +24,8 @@ struct Job {
 };
 
 using OnFinish = std::function<void(const std::string, const Job&, const std::any, std::chrono::system_clock::time_point)>;
+
+using CollectResult = std::any;
+
+// 统一的可调用签名
+using CollectFunc = std::function<CollectResult(const Job&)>;
