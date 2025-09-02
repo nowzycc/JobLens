@@ -29,3 +29,12 @@ using CollectResult = std::any;
 
 // 统一的可调用签名
 using CollectFunc = std::function<CollectResult(const Job&)>;
+using CollectInitFunc = std::function<bool(const nlohmann::json& config)>;
+using CollectDeinitFunc = std::function<void()>;
+
+
+struct CollectorHandle {
+    CollectInitFunc        init;   
+    CollectFunc            collect;
+    CollectDeinitFunc      deinit;
+};

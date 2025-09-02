@@ -16,9 +16,7 @@ public:
 
     // 工厂：根据名称 + JSON 配置生成一个“已初始化”的可调用对象
     // 返回 nullptr 表示失败
-    std::unique_ptr<CollectFunc> createCollector(
-        const std::string& name,
-        const nlohmann::json& config) const;
+    CollectorHandle CollectorRegistry::createCollector(const std::string& name) const;
 
     // 列举已注册采集器（调试用）
     std::vector<std::string> list() const;

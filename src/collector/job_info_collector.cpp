@@ -1,4 +1,5 @@
 #include "collector/job_info_collector.hpp"
+#include "collector/collector_registry.hpp"
 #include <sstream>
 #include "common/config.hpp"
 
@@ -29,7 +30,6 @@ std::string string2JobOpt(const std::string& str, Job& job) {
     catch(const std::exception& e)
     {
         spdlog::warn("JobInfoCollector: error parsing JobCreateTime for job ID {}: {}", job.JobID, e.what());
-        // job.JobCreateTime = std::chrono::system_clock::now();
     }
     return opt;
     
@@ -57,20 +57,64 @@ JobInfoCollector::JobInfoCollector()
     registerCollectFuncs();
     registerFinishCallbacks();
     spdlog::info("JobInfoCollector: initialized with {} collect functions and {} finish callbacks",
-                collectFuncs_.size(), finishCallbacks_.size());
+                collector_info_dict.size(), collector_info_dict.size());
 }
 
 JobInfoCollector::~JobInfoCollector() { shutdown(); }
 
-void JobInfoCollector::initCollector(){
+void JobInfoCollector::startCollector(std::string collector_name){
+    std::function<std::any(Job&)> func_handle;
+    collector_info info; 
+    std::string config_name;
+    try
+    {
+        info = collector_info_dict.at(collector_name);
+    }
+    catch(const std::exception& e)
+    {
+        spdlog::error("JobInfoCollector: start collector error, can not find {}!",collector_name);
+        return;
+    }
+    auto config_node = Config::instance().getRawNode(info.config_name);
+    auto j_config = yamlToJson(config_node);
+    info.init_handle(j_config);
+    auto freq = Config::instance().getInt(info.config_name, "freq");
+
+    auto& collector_job = collector_job_dict[collector_name];
+
     
+    collector_job.task_id = timerScheduler_.registerRepeatingTimer(
+        std::chrono::milliseconds(1000/freq),
+        [this, collector_name](){
+            auto& info = collector_info_dict[collector_name];
+            auto& collector_job = collector_job_dict[collector_name];
+            {
+                std::lock_guard lg(collector_job.m_);
+                if(collector_job.job_list.size() == 0){
+                    //没有任务，取消这个收集器，节省资源
+                    timerScheduler_.cancelTimer(collector_job.task_id);
+                }
+                for(auto& job:collector_job.job_list){
+                    //TODO:当压力过高时，这里应该改为非阻塞执行
+                    auto ret = info.collect_handle(job);
+                    for(auto& cb:finishCallbacks_){
+                        cb(collector_name, job, ret, std::chrono::system_clock::now());
+                    }
+                }
+            }
+        }
+    );
+
 }
 
 void JobInfoCollector::addJob2Collector(Job& job, std::string collector){
-    auto state = collector_job_list[collector];
-    state.job_list.push_back(job);
+    auto& state = collector_job_dict[collector];
+    {
+        std::lock_guard lg(state.m_);
+        state.job_list.push_back(job);
+    }
     if(!state.running){
-        
+        startCollector(collector);
     }
 }
 
@@ -81,10 +125,14 @@ void JobInfoCollector::addJobCollect(Job& job){
     }
 }
 
-void JobInfoCollector::addCollectFunc(std::string name, std::string config, std::function<std::any(Job&)> f) {
+void JobInfoCollector::addCollectFunc(std::string name, std::string config, CollectFunc collector_handle,CollectInitFunc init_handle,CollectDeinitFunc deinit_handle) {
     std::lock_guard lg(m_);
-    collectFuncs_.push_back(std::make_tuple(name, config, std::move(f)));
-}
+    collector_info_dict[name].name = name;
+    collector_info_dict[name].config_name = config;
+    collector_info_dict[name].collect_handle = collector_handle;
+    collector_info_dict[name].init_handle = init_handle;
+    collector_info_dict[name].deinit_handle = deinit_handle;
+}   
 
 void JobInfoCollector::addCallback(OnFinish cb) {
     std::lock_guard lg(m_);
@@ -138,6 +186,27 @@ JobInfoCollector& JobInfoCollector::instance() {
     return instance;
 }
 
+// 递归将 YAML 节点转换为 JSON
+nlohmann::json yamlToJson(const YAML::Node& node) {
+    if (node.IsNull()) {
+        return nullptr;
+    } else if (node.IsScalar()) {
+        return node.as<std::string>(); // 可根据需要转换类型
+    } else if (node.IsSequence()) {
+        nlohmann::json arr = nlohmann::json::array();
+        for (const auto& item : node) {
+            arr.push_back(yamlToJson(item));
+        }
+        return arr;
+    } else if (node.IsMap()) {
+        nlohmann::json obj = nlohmann::json::object();
+        for (const auto& kv : node) {
+            obj[kv.first.as<std::string>()] = yamlToJson(kv.second);
+        }
+        return obj;
+    }
+    return nullptr;
+}
 
 void JobInfoCollector::registerCollectFuncs() {
     global_config = Config::instance();
@@ -155,15 +224,21 @@ void JobInfoCollector::registerCollectFuncs() {
             c.config = node["config"].as<std::string>();
             return c;
         });
-
+    auto collector_reg = CollectorRegistry::instance();
+    
     for (const auto& collector : collectors) {
-        if (collector.type == COLLECTOR_TYPE_PROC) {
-            addCollectFunc(
-                collector.name,
-                collector.config,
-                proc_collector::collect
-            );
+        
+        auto collector_handle = collector_reg.createCollector(collector.type);
+        if (!collector_handle.init) {
+            spdlog::error("JobInfoCollector: {} init error",collector.name);
         }
+        addCollectFunc(
+            collector.name,
+            collector.config,
+            collector_handle.collect,
+            collector_handle.init,
+            collector_handle.deinit
+        );
     }
 }
 

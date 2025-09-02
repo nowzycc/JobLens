@@ -10,7 +10,7 @@ JobRegistry& JobRegistry::instance() {
 void JobRegistry::addJob(Job job) {
     {
         std::unique_lock lg(mtx_);
-        if (jobs_.contains(job.JobID)) {
+        if (jobs_.count(job.JobID)) {
             spdlog::warn("JobRegistry: duplicate jobID {}, ignored", job.JobID);
             return;
         }

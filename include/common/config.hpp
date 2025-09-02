@@ -23,6 +23,8 @@ public:
                           const std::string& key) const;
     std::string getString(const std::string& parentKey,
                           const std::string& key) const;
+    
+    YAML::Node getRawNode(const std::string& parentKey) const;
 
     // 数组读取
     template<typename T>
