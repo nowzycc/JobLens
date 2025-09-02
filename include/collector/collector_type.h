@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <functional>
 #include <any>
+#include <nlohmann/json.hpp>
 
 #define COLLECTOR_TYPE_PROC "ProcCollector"
 

@@ -62,6 +62,29 @@ JobInfoCollector::JobInfoCollector()
 
 JobInfoCollector::~JobInfoCollector() { shutdown(); }
 
+// 递归将 YAML 节点转换为 JSON
+nlohmann::json yamlToJson(const YAML::Node& node) {
+    if (node.IsNull()) {
+        return nullptr;
+    } else if (node.IsScalar()) {
+        return node.as<std::string>(); // 可根据需要转换类型
+    } else if (node.IsSequence()) {
+        nlohmann::json arr = nlohmann::json::array();
+        for (const auto& item : node) {
+            arr.push_back(yamlToJson(item));
+        }
+        return arr;
+    } else if (node.IsMap()) {
+        nlohmann::json obj = nlohmann::json::object();
+        for (const auto& kv : node) {
+            obj[kv.first.as<std::string>()] = yamlToJson(kv.second);
+        }
+        return obj;
+    }
+    return nullptr;
+}
+
+
 void JobInfoCollector::startCollector(std::string collector_name){
     std::function<std::any(Job&)> func_handle;
     collector_info info; 
@@ -94,7 +117,7 @@ void JobInfoCollector::startCollector(std::string collector_name){
                     //没有任务，取消这个收集器，节省资源
                     timerScheduler_.cancelTimer(collector_job.task_id);
                 }
-                for(auto& job:collector_job.job_list){
+                for(auto& job: collector_job.job_list){
                     //TODO:当压力过高时，这里应该改为非阻塞执行
                     auto ret = info.collect_handle(job);
                     for(auto& cb:finishCallbacks_){
@@ -111,7 +134,7 @@ void JobInfoCollector::addJob2Collector(Job& job, std::string collector){
     auto& state = collector_job_dict[collector];
     {
         std::lock_guard lg(state.m_);
-        state.job_list.push_back(job);
+        state.job_list.push_back(job); 
     }
     if(!state.running){
         startCollector(collector);
@@ -186,27 +209,6 @@ JobInfoCollector& JobInfoCollector::instance() {
     return instance;
 }
 
-// 递归将 YAML 节点转换为 JSON
-nlohmann::json yamlToJson(const YAML::Node& node) {
-    if (node.IsNull()) {
-        return nullptr;
-    } else if (node.IsScalar()) {
-        return node.as<std::string>(); // 可根据需要转换类型
-    } else if (node.IsSequence()) {
-        nlohmann::json arr = nlohmann::json::array();
-        for (const auto& item : node) {
-            arr.push_back(yamlToJson(item));
-        }
-        return arr;
-    } else if (node.IsMap()) {
-        nlohmann::json obj = nlohmann::json::object();
-        for (const auto& kv : node) {
-            obj[kv.first.as<std::string>()] = yamlToJson(kv.second);
-        }
-        return obj;
-    }
-    return nullptr;
-}
 
 void JobInfoCollector::registerCollectFuncs() {
     global_config = Config::instance();

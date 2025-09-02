@@ -12,11 +12,15 @@ public:
 
     // 注册模板：把任意类型 T 登记到 name 名下
     template <typename T>
-    void registerCollector(std::string name);
+    void registerCollector(std::string name) {
+        factories_.emplace(std::move(name), []() -> std::unique_ptr<ICollector> {
+            return std::make_unique<T>();
+        });
+    };
 
     // 工厂：根据名称 + JSON 配置生成一个“已初始化”的可调用对象
     // 返回 nullptr 表示失败
-    CollectorHandle CollectorRegistry::createCollector(const std::string& name) const;
+    CollectorHandle createCollector(const std::string& name) const;
 
     // 列举已注册采集器（调试用）
     std::vector<std::string> list() const;

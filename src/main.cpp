@@ -10,6 +10,7 @@
 #include "common/job_starter.hpp"
 #include "common/permission_opt.hpp"
 
+#include "collector/job_registry.hpp"
 #include "collector/job_info_collector.hpp"
 
 void onExitCallback(int pid, int exit_code) {
@@ -29,8 +30,8 @@ void onBecomeMaster() {
     if (first_run) {
         first_run = false;
         auto pid = JobStarter::instance().getChildPID();
-        JobInfoCollector::instance().addJob({
-            .JobID = 1, 
+        JobRegistry::instance().addJob({
+            .JobID = 1,
             .JobPIDs = {pid},
             .JobCreateTime = std::chrono::system_clock::now()
         });

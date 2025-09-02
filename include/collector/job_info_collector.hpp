@@ -38,12 +38,11 @@ public:
     JobInfoCollector& operator=(JobInfoCollector&&)      = default;
 
     // 对外接口
-    void JobInfoCollector::addCollectFunc(std::string name, std::string config, CollectFunc colloctor_handle,CollectInitFunc init_handle,CollectDeinitFunc deinit_handle);
+    void addCollectFunc(std::string name, std::string config, CollectFunc colloctor_handle,CollectInitFunc init_handle,CollectDeinitFunc deinit_handle);
     void addCallback(OnFinish cb);
-    void addJob(Job job);
-    void delJob(int jobID);
     void start();
     void shutdown();
+    
     nlohmann::json snapshot();
 
     static JobInfoCollector& instance();
@@ -60,7 +59,7 @@ private:
     std::optional<StreamWatcher> job_opt_;
 
     struct collector_state{
-        std::vector<Job&> job_list;
+        std::vector<std::reference_wrapper<Job>> job_list;
         std::mutex              m_;
         size_t task_id;
         bool running;

@@ -8,23 +8,18 @@ CollectorRegistry& CollectorRegistry::instance() {
     return reg;
 }
 
-template <typename T>
-void CollectorRegistry::registerCollector(std::string name) {
-    factories_.emplace(std::move(name), []() -> std::unique_ptr<ICollector> {
-        return std::make_unique<T>();
-    });
-}
+
 
 CollectorHandle CollectorRegistry::createCollector(const std::string& name) const {
     auto it = factories_.find(name);
     if (it == factories_.end())
         return {};                     // 空句柄，调用方可判空
 
-    auto impl = it->second();          // 创建采集器实例
+    auto impl = std::shared_ptr<ICollector>(it->second().release()); // 创建采集器实例并转为shared_ptr
     return {
-        [impl = std::move(impl)](const nlohmann::json& cfg) { return impl->init(cfg); },
-        [impl = std::move(impl)](const Job& job) { return impl->collect(job); },
-        [impl = std::move(impl)](){ impl->deinit(); }
+        [impl](const nlohmann::json& cfg) { return impl->init(cfg); },
+        [impl](const Job& job) { return impl->collect(job); },
+        [impl](){ impl->deinit(); }
     };
 }
 
