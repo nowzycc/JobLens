@@ -5,7 +5,7 @@ from threading import Thread
 import yaml
 import json
 import time
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,app
 
 Joblens_path = "/home/nowzycc/code/JobLens_cpp/build/JobLens"
 Config_path = "/home/nowzycc/code/JobLens_cpp/config/config.yaml"
