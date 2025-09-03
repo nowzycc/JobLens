@@ -95,7 +95,7 @@ void init() {
     auto level_enum = log_level_map.at(log_level);
     spdlog::set_level(level_enum); // 设置日志级别
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S] [%l] %v"); // 设置日志格式
-    print_logo();
+    
 }
 
 void get_main_mtx(){
@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
     options.add_options()
         ("h,help", "Show help")
         ("c,config", "Configuration file path", cxxopts::value<std::string>()->default_value("config.yaml"))
-        ("m,mode", "run mode (default: starter)", cxxopts::value<bool>()->default_value("starter"))
+        ("m,mode", "run mode (default: starter)", cxxopts::value<std::string>()->default_value("starter"))
         ("e,exec", "Executable to run", cxxopts::value<std::string>())
         ("a,args", "Arguments for the executable", cxxopts::value<std::vector<std::string>>()->default_value(""));
     
@@ -120,21 +120,32 @@ int main(int argc, char* argv[]) {
         std::cout << options.help() << std::endl;
         return 0;
     }
+
+    print_logo();
+
     auto mode = result["mode"].as<std::string>();
     std::transform(mode.begin(), mode.end(), mode.begin(), ::tolower);
     Config::instance(result["config"].as<std::string>());
-
     init();
+    
 
-    if (mode.compare("starter")){
-        
+    if (mode.compare("starter") == 0){
+        try{
+            auto exe = result["exec"].as<std::string>();
+            auto args = result["args"].as<std::vector<std::string>>();
+        }
+        catch(const std::exception& e)
+        {
+            spdlog::error("Main: arg 'exe' or 'args' error");
+        }
+  
 
         DistributedNode::instance().set_become_master_callback(onBecomeMaster);
 
         DistributedNode::instance().set_become_slave_callback(onBecomeSlave);
 
         JobStarter::instance().setCallback(onExitCallback);
-
+        
         auto ret = JobStarter::instance().launch({
             .exe = result["exec"].as<std::string>(),
             .args = result["args"].as<std::vector<std::string>>(),
@@ -149,7 +160,7 @@ int main(int argc, char* argv[]) {
         DistributedNode::instance().start();
     }
 
-    if (mode.compare("service")){
+    if (mode.compare("service") == 0){
         onBecomeService();
     }
     

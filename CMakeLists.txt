@@ -110,3 +110,58 @@ install(TARGETS JobLens
 # 如果你想把 include 目录也安装出去：
 # install(DIRECTORY ${PROFILER_INC_DIR}
 #         DESTINATION include)
+
+# ====================== 追加到原 CMakeLists.txt 末尾 ======================
+
+# ----------------------------------------------
+# 10. CPack 通用配置
+# ----------------------------------------------
+set(CPACK_PACKAGE_NAME "JobLens")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "High-performance job profiler")
+set(CPACK_PACKAGE_VENDOR "nowzycc")
+set(CPACK_PACKAGE_CONTACT "wangzhenyuan@ihep.ac.com")
+# set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")  # 如有
+# set(CPACK_RESOURCE_FILE_README  "${CMAKE_SOURCE_DIR}/README.md")
+
+# 生成两种格式：tar.gz + deb
+set(CPACK_GENERATOR "TGZ;DEB")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "")   # 我们自带 .so，留空即可
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}")
+
+# 安装前缀：打包时所有文件会以 /opt/JobLens 为根
+# set(CPACK_PACKAGING_INSTALL_PREFIX "/opt/JobLens")
+
+# ----------------------------------------------
+# 11. 自动收集并安装运行时 .so
+# ----------------------------------------------
+# 11-1 准备 staging 目录
+set(DEPS_STAGING_DIR "${CMAKE_BINARY_DIR}/runtime_deps")  # 临时收集目录
+file(MAKE_DIRECTORY "${DEPS_STAGING_DIR}")
+
+# 11-2 获取目标所有运行时依赖（排除系统白名单）
+add_custom_target(collect_deps ALL
+    COMMAND ${CMAKE_COMMAND} -E env
+        LD_LIBRARY_PATH=${DEPS_STAGING_DIR}:$ENV{LD_LIBRARY_PATH}
+        bash "${CMAKE_SOURCE_DIR}/scripts/collect_libs.sh"
+            $<TARGET_FILE:JobLens>          # 主可执行文件
+            ${DEPS_STAGING_DIR}             # 输出目录
+    COMMENT "Collecting runtime .so ..."
+    VERBATIM
+)
+
+# 11-3 把收集到的 .so 安装到 lib/ 目录，并自动加入包
+install(DIRECTORY ${DEPS_STAGING_DIR}/
+        DESTINATION lib
+        FILES_MATCHING PATTERN "*.so*")
+
+# 11-4 让可执行文件优先找同目录 lib/ 下的 .so
+#     注意：必须在 install() 之后，否则 install(TARGETS) 会覆盖 rpath
+set_target_properties(JobLens PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../lib"   # 相对可执行文件 bin/JobLens -> ../lib
+)
+
+# ----------------------------------------------
+# 12. 启用 CPack
+# ----------------------------------------------
+include(CPack)
