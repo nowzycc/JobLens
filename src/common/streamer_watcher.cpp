@@ -78,7 +78,7 @@ public:
         }
 
         epoll_event ev{};
-        ev.events = EPOLLIN;
+        ev.events = EPOLLIN | EPOLLET;
         ev.data.fd = fd_;
         if (epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fd_, &ev) < 0){
             ::close(fd_);
@@ -100,7 +100,7 @@ public:
             constexpr int max_events = 64;
             epoll_event events[max_events];
             while (!stop_flag_) {
-                int nf = epoll_wait(epoll_fd_, events, max_events, 200);
+                int nf = epoll_wait(epoll_fd_, events, max_events, -1);
                 if (nf < 0) {
                     if (errno == EINTR) continue;
                     spdlog::error("epoll_wait failed: {}", strerror(errno));
@@ -132,6 +132,7 @@ private:
                 return;
             }
         }
+        spdlog::debug("StreamWatcher: enter an event");
         // 普通数据可读
         char buf[4096];
         ssize_t n = read(ev.data.fd, buf, sizeof(buf));
