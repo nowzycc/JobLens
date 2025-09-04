@@ -7,11 +7,64 @@
 #include <dirent.h>
 #include <limits>
 #include <vector>
+#include <unordered_map>
+#include <list>
+#include <stdexcept>
+#include <optional>
+
 
 #include "collector/collector_type.h"
 #include <any>
 #include <iostream>
 #include <fmt/chrono.h>
+
+template<class K, class V>
+class lru_cache {
+public:
+    explicit lru_cache(std::size_t capacity) : cap_(capacity) {
+        if (cap_ == 0) throw std::invalid_argument("capacity must > 0");
+    }
+
+    /* 查询 */
+    std::optional<V> get(const K& key) {
+        auto it = map_.find(key);
+        if (it == map_.end()) return std::nullopt;
+        touch(it->second);          // 移到最新
+        return it->second->second;
+    }
+
+    /* 插入或更新 */
+    void put(const K& key, const V& val) {
+        auto it = map_.find(key);
+        if (it != map_.end()) {     // 已存在
+            it->second->second = val;
+            touch(it->second);
+            return;
+        }
+        if (map_.size() == cap_) {  // 满，淘汰最老
+            map_.erase(list_.back().first);
+            list_.pop_back();
+        }
+        list_.emplace_front(key, val);
+        map_[key] = list_.begin();
+    }
+
+    std::size_t size() const noexcept { return map_.size(); }
+
+private:
+    using node_t = std::pair<K, V>;                // list 中存的 kv 对
+    using list_t = std::list<node_t>;
+    using iter_t = typename list_t::iterator;
+
+    std::unordered_map<K, iter_t> map_;
+    list_t                        list_;
+    std::size_t                   cap_;
+
+    /* 把节点移到链表头 */
+    void touch(iter_t it) {
+        list_.splice(list_.begin(), list_, it);
+    }
+};
 
 namespace proc_collector {
 
@@ -38,7 +91,26 @@ std::optional<std::size_t> getMemTotalKb() {
 }
 
 std::unique_ptr<proc_info> snapshotOf(int pid) {
+    struct cpu_usage
+    {
+        double      cpuPercent{};      
+        unsigned long long utime{};
+        unsigned long long stime{};
+        unsigned long long starttime{};
+        long hz{};
+        long numCores{};
+        unsigned long long lastTotal{};
+        unsigned long long lastProc{};
+    };
+    //TODO:这里记得进行修改为可配置参数
+    static lru_cache<int, cpu_usage> pid_cpu_dict(256);
     try {
+        if(pid_cpu_dict.get(pid))
+        {
+            std::cout<<"new pid"<<std::endl;
+            cpu_usage cu;
+            pid_cpu_dict.put(pid, cu);
+        }
         auto info = std::make_unique<proc_info>();
         info->pid = pid;
 
@@ -139,6 +211,77 @@ std::unique_ptr<proc_info> snapshotOf(int pid) {
                             ++info->netConnCount;
                     }
                 }
+            }
+        }
+        /* 6. /proc/<pid>/stat 中 CPU 时间 & 动态 CPU 使用率 --------------------- */
+        {
+            /* 注意：前面已经读过 /proc/<pid>/stat，但 istream 状态已失效，
+               这里重新打开一次，保证代码独立可拷贝 */
+            std::ifstream f(fmt::format("/proc/{}/stat", pid));
+            if (!f) return nullptr;
+
+            std::string line;
+            std::getline(f, line);
+            std::istringstream iss(line);
+
+            int _pid;
+            iss >> _pid;
+            if (iss.peek() == ' ') iss.ignore();
+            if (iss.peek() == '(') {
+                iss.ignore();
+                std::getline(iss, info->name, ')');
+            } else {
+                iss >> info->name;
+            }
+
+            /* 跳过到第 14、15、22 列 */
+            unsigned long long utime = 0, stime = 0, starttime = 0;
+            for (int i = 0; i < 11; ++i)
+                iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
+            iss >> utime >> stime;                 // 14,15
+            for (int i = 0; i < 4; ++i)
+                iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
+            iss >> starttime;                      // 22
+
+            info->utime = utime;
+            info->stime = stime;
+            info->starttime = starttime;
+
+            /* ---- 计算 CPU 百分比 ---- */
+            info->hz = sysconf(_SC_CLK_TCK);      // 每秒 jiffies
+            info->numCores = sysconf(_SC_NPROCESSORS_ONLN);
+            if (info->hz > 0 && info->numCores > 0) {
+                auto cpuStat = []() -> unsigned long long {   // 取系统总 CPU 时间
+                    std::ifstream f("/proc/stat");
+                    std::string line;
+                    std::getline(f, line);
+                    std::istringstream iss(line);
+                    std::string _;
+                    unsigned long long v, sum = 0;
+                    iss >> _;                          
+                    while (iss >> v) sum += v;
+                    return sum;
+                };
+
+                unsigned long long currTotal = cpuStat();
+                unsigned long long currProc  = utime + stime;
+                auto cu = pid_cpu_dict.get(pid);
+                unsigned long long deltaTotal = currTotal - cu->lastTotal;
+                unsigned long long deltaProc  = currProc  - cu->lastProc;
+                std::cout<<currTotal<<"   "<<currProc<<std::endl;
+                std::cout<<cu->lastTotal<<"   "<<cu->lastProc<<std::endl;
+                std::cout<<deltaTotal<<"   "<<deltaProc<<std::endl;
+                if (deltaTotal > 0) {
+                    info->cpuPercent = 100.0 * deltaProc / deltaTotal;
+                } else {
+                    info->cpuPercent = 0.0;
+                }
+
+                /* 更新静态缓存（用于下一次采样） */
+                cu->lastTotal = currTotal;
+                cu->lastProc  = currProc;
+            } else {
+                info->cpuPercent = 0.0;
             }
         }
 

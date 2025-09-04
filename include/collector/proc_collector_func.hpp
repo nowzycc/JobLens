@@ -23,7 +23,15 @@ struct proc_info {
     int         pid{};
     std::string name;
     int         ppid{};
-    double      cpuPercent{};      // CPU 占用率
+    // CPU 相关信息
+    double      cpuPercent{};      
+    unsigned long long utime{};
+    unsigned long long stime{};
+    unsigned long long starttime{};
+    long hz{};
+    long numCores{};
+    
+    // 内存相关信息
     std::size_t memoryRss{};       // 字节
     double      memoryPercent{};
     int         numThreads{};
