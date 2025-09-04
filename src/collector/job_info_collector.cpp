@@ -2,6 +2,14 @@
 #include <sstream>
 #include "common/config.hpp"
 
+#include <unistd.h>   // kill, getpid
+#include <signal.h>
+#include <sys/types.h>
+#include <cerrno>     // errno
+#include <cstring>    // strerror
+#include <stdexcept>
+#include <string>
+
 #include <iostream>
 
 JobInfoCollector::JobInfoCollector()
@@ -37,8 +45,18 @@ void JobInfoCollector::addCallback(OnFinish cb) {
 
 void JobInfoCollector::addJob(Job job) {
     std::lock_guard lg(m_);
-    spdlog::info("JobInfoCollector: adding job ID {} with {} PIDs", job.JobID, job.JobPIDs.size());
+    if(job.JobPIDs.empty()){
+        spdlog::error("JobInfoCollector: add job error, empty job pids");
+        return;
+    }
+    for(auto& cjob: currJobs_){
+        if(cjob.JobID == job.JobID){
+            spdlog::error("JobInfoCollector: add job error, same job id");
+            return;
+        }
+    }
     currJobs_.push_back(job);
+    spdlog::info("JobInfoCollector: add job ID {} with {} PIDs", job.JobID, job.JobPIDs.size());
 }
 
 void JobInfoCollector::delJob(int jobID) {
@@ -46,6 +64,15 @@ void JobInfoCollector::delJob(int jobID) {
     auto it = std::remove_if(currJobs_.begin(), currJobs_.end(),
                              [=](const Job& j){ return j.JobID == jobID; });
     currJobs_.erase(it, currJobs_.end());
+}
+
+inline bool isPidAlive(pid_t pid)
+{
+    if (pid <= 0) return false;
+    if (kill(pid, 0) == 0) return true;          // 存在
+    if (errno == ESRCH) return false;              // 不存在
+    // 其它错误码（如 EPERM）统一视为“不可发信号”，也算“不存在”
+    return false;
 }
 
 void JobInfoCollector::start() {
@@ -60,13 +87,27 @@ void JobInfoCollector::start() {
                 std::lock_guard lg(m_);
                 auto name = std::get<0>(func_tuple);
                 auto func = std::get<2>(func_tuple);
-                for (auto& job : currJobs_) {
+                
+                for (auto jobIt = currJobs_.begin(); jobIt != currJobs_.end(); ) {
+                    auto& job = *jobIt;                       // 方便后面使用
+                    job.JobPIDs.erase(
+                        std::remove_if(job.JobPIDs.begin(), job.JobPIDs.end(),
+                                    [](pid_t pid){ return !isPidAlive(pid); }),
+                        job.JobPIDs.end());
+
+                    if (job.JobPIDs.empty()) {
+                        spdlog::debug("JobPIDs is empty, remove job {}", job.JobID);
+                        jobIt = currJobs_.erase(jobIt);       // 删除并返回下一个迭代器
+                        continue;                             // 已经 ++ 过了，直接 continue
+                    }
+
                     auto info = func(job);
                     for (const auto& cb : finishCallbacks_) {
-                        spdlog::debug("JobInfoCollector: invoking callback for collector '{}', job ID {}", name, job.JobID);
+                        spdlog::debug("JobInfoCollector: invoking callback for collector '{}', job ID {}",
+                                    name, job.JobID);
                         cb(name, job, std::move(info), std::chrono::system_clock::now());
                     }
-                    
+                    ++jobIt;                                  // 只有没 erase 时才手动++
                 }
             }
         );
@@ -118,7 +159,7 @@ void JobInfoCollector::string2Job(const std::string& str, Job& job) {
     catch(const std::exception& e)
     {
         spdlog::warn("JobInfoCollector: error parsing JobCreateTime for job ID {}: {}", job.JobID, e.what());
-        // job.JobCreateTime = std::chrono::system_clock::now();
+        job.JobCreateTime = std::chrono::system_clock::now();
     }
     
 }
