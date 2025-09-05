@@ -105,10 +105,12 @@ std::unique_ptr<proc_info> snapshotOf(int pid) {
     //TODO:这里记得进行修改为可配置参数
     static lru_cache<int, cpu_usage> pid_cpu_dict(256);
     try {
-        if(pid_cpu_dict.get(pid))
+        if(pid_cpu_dict.get(pid) == std::nullopt)
         {
             std::cout<<"new pid"<<std::endl;
             cpu_usage cu;
+            cu.lastProc = 0;
+            cu.lastTotal = 0;
             pid_cpu_dict.put(pid, cu);
         }
         auto info = std::make_unique<proc_info>();
@@ -266,13 +268,14 @@ std::unique_ptr<proc_info> snapshotOf(int pid) {
                 unsigned long long currTotal = cpuStat();
                 unsigned long long currProc  = utime + stime;
                 auto cu = pid_cpu_dict.get(pid);
+                std::cout<<"use pid:"<<pid<<std::endl;
                 unsigned long long deltaTotal = currTotal - cu->lastTotal;
                 unsigned long long deltaProc  = currProc  - cu->lastProc;
-                std::cout<<currTotal<<"   "<<currProc<<std::endl;
-                std::cout<<cu->lastTotal<<"   "<<cu->lastProc<<std::endl;
-                std::cout<<deltaTotal<<"   "<<deltaProc<<std::endl;
+                std::cout<<"currTotal="<<currTotal<<"   currProc="<<currProc<<std::endl;
+                std::cout<<"lastTotal="<<cu->lastTotal<<"   lastProc="<<cu->lastProc<<std::endl;
+                std::cout<<"deltaTotal="<<deltaTotal<<"   deltaProc="<<deltaProc<<std::endl;
                 if (deltaTotal > 0) {
-                    info->cpuPercent = 100.0 * deltaProc / deltaTotal;
+                    info->cpuPercent = 100.0 * double(deltaProc) / double(deltaTotal);
                 } else {
                     info->cpuPercent = 0.0;
                 }
@@ -280,6 +283,7 @@ std::unique_ptr<proc_info> snapshotOf(int pid) {
                 /* 更新静态缓存（用于下一次采样） */
                 cu->lastTotal = currTotal;
                 cu->lastProc  = currProc;
+                std::cout<<"lastTotal="<<cu->lastTotal<<"   lastProc="<<cu->lastProc<<std::endl;
             } else {
                 info->cpuPercent = 0.0;
             }
