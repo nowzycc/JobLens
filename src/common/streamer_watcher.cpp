@@ -78,7 +78,7 @@ public:
         }
 
         epoll_event ev{};
-        ev.events = EPOLLIN;
+        ev.events = EPOLLIN | EPOLLET;
         ev.data.fd = fd_;
         if (epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fd_, &ev) < 0){
             ::close(fd_);

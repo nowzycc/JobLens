@@ -1,59 +1,24 @@
 #include "collector/job_info_collector.hpp"
 #include "collector/collector_registry.hpp"
+#include "collector/job_registry.hpp"
 #include <sstream>
 #include "common/config.hpp"
 
 #include <iostream>
 
-std::string string2JobOpt(const std::string& str, Job& job) {
-
-
-    nlohmann::json j = nlohmann::json::parse(str);
-    auto opt = j["opt"].get<std::string>();
-    job.JobID = j["JobID"].get<int>();
-    job.JobPIDs = j["JobPIDs"].get<std::vector<int>>();
-    if (job.JobPIDs.size() == 0) {
-        spdlog::warn("JobInfoCollector: job ID {} has empty PID list", job.JobID);
-    }
-    for (auto pid: job.JobPIDs) {
-        if (pid > 0) {
-            spdlog::warn("JobInfoCollector: invalid PID {} in job ID {}", pid, job.JobID);
-        }
-    }
-    try
-    {
-        date::sys_seconds tp;
-        std::istringstream in{j["JobCreateTime"].get<std::string>()};
-        in >> date::parse("%F %T", tp);
-        job.JobCreateTime = tp;
-    }
-    catch(const std::exception& e)
-    {
-        spdlog::warn("JobInfoCollector: error parsing JobCreateTime for job ID {}: {}", job.JobID, e.what());
-    }
-    return opt;
-    
-}
-
-
 JobInfoCollector::JobInfoCollector()
 {
-    job_opt_.emplace(StreamWatcher::Config{
-        .type = StreamWatcher::Type::FIFO,
-        .path = Config::instance().getString("collectors_config", "job_adder_fifo")
-    },
-    [this](const char* buf, std::size_t len) {
-        Job job;
-        auto opt = string2JobOpt(std::string(buf, len), job);
-        if(opt.compare("add") == 0){
-
+    JobRegistry::instance().addLifecycleCb(
+        [this](JobEvent e, const Job& job){
+            if (e == JobEvent::Added){
+                addJobCollect(job);
+            }
+            if (e == JobEvent::Removed){
+                rmJobCollect(job);
+            }
         }
-        if(opt.compare("remove") == 0){
-            
-        }
-    });
+    );
     
-
     registerCollectFuncs();
     registerFinishCallbacks();
     spdlog::info("JobInfoCollector: initialized with {} collect functions and {} finish callbacks",
@@ -103,48 +68,82 @@ void JobInfoCollector::startCollector(std::string collector_name){
     info.init_handle(j_config);
     auto freq = Config::instance().getInt(info.config_name, "freq");
 
-    auto& collector_job = collector_job_dict[collector_name];
+    auto& collector_job = collector_state_dict[collector_name];
 
     
     collector_job.task_id = timerScheduler_.registerRepeatingTimer(
         std::chrono::milliseconds(1000/freq),
         [this, collector_name](){
             auto& info = collector_info_dict[collector_name];
-            auto& collector_job = collector_job_dict[collector_name];
+            auto& collector_job = collector_state_dict[collector_name];
+            
             {
                 std::lock_guard lg(collector_job.m_);
-                if(collector_job.job_list.size() == 0){
+                if(collector_job.jobid_list.size() == 0){
+                    //由JobRegistry完成任务清理工作
                     //没有任务，取消这个收集器，节省资源
+                    info.deinit_handle();
                     timerScheduler_.cancelTimer(collector_job.task_id);
                 }
-                for(auto& job: collector_job.job_list){
-                    //TODO:当压力过高时，这里应该改为非阻塞执行
-                    auto ret = info.collect_handle(job);
+            }
+
+            for(auto jobid: collector_job.jobid_list){
+                //TODO:当压力过高时，这里应该改为非阻塞执行
+                auto job = JobRegistry::instance().findJob(jobid);
+                if(job == nullptr)continue;
+
+
+                {
+                    std::lock_guard lg(collector_job.m_);
+                    std::any ret;
+                    try
+                    {
+                        ret = info.collect_handle(*job);
+                    }
+                    catch(const std::exception& e)
+                    {
+                        spdlog::error("JobInfoCollector: collector {} collect error: {}", collector_name, e.what());
+                        std::cerr << e.what() << '\n';
+                    }
                     for(auto& cb:finishCallbacks_){
-                        cb(collector_name, job, ret, std::chrono::system_clock::now());
+                        cb(collector_name, *job, ret, std::chrono::system_clock::now());
                     }
                 }
+                
             }
+            
         }
     );
 
 }
 
-void JobInfoCollector::addJob2Collector(Job& job, std::string collector){
-    auto& state = collector_job_dict[collector];
-    {
-        std::lock_guard lg(state.m_);
-        state.job_list.push_back(job); 
-    }
+void JobInfoCollector::addJob2Collector(int jobid, std::string collector){
+    auto& state = collector_state_dict[collector];
+    state.jobid_list.push_back(jobid); 
     if(!state.running){
         startCollector(collector);
     }
 }
 
-void JobInfoCollector::addJobCollect(Job& job){
+void JobInfoCollector::addJobCollect(const Job& job){
     std::lock_guard lg(m_);
     for(auto collector_name:job.CollectorNames){
-        addJob2Collector(job, collector_name);
+        addJob2Collector(job.JobID, collector_name);
+    }
+}
+
+void JobInfoCollector::rmJobCollect(const Job& job){
+    for(auto collector_name:job.CollectorNames){
+        try
+        {
+            auto& state = collector_state_dict.at(collector_name);
+            int id = job.JobID;
+            state.jobid_list.erase(std::remove_if(state.jobid_list.begin(),state.jobid_list.end(),[id](int x){return x==id;}));
+        }
+        catch(const std::exception& e)
+        {
+            spdlog::error("JobInfoCollector: collector {} remove job {} error beacause {}",collector_name,job.JobID,e.what());
+        }
     }
 }
 

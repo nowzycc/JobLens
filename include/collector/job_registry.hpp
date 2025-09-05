@@ -7,6 +7,8 @@
 #include "collector/collector_type.h"
 #include "job_lifecycle_event.h"
 
+
+
 class JobRegistry {
 public:
     static JobRegistry& instance();          // 仍保留单例，方便迁移；也可由 main() 构造
@@ -26,8 +28,8 @@ public:
     void addLifecycleCb(JobLifecycleCb cb);
 
 private:
-    JobRegistry() = default;
-
+    JobRegistry();
+    std::optional<StreamWatcher> job_opt_;
     mutable std::shared_mutex              mtx_;
     std::unordered_map<int, Job>           jobs_;   // key = JobID
     std::vector<JobLifecycleCb>            cbs_;

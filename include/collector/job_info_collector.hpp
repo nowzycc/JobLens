@@ -51,15 +51,16 @@ private:
     void registerCollectFuncs();
     void registerFinishCallbacks();
     void onJobLifecycle(JobEvent ev, Job& job);
-    void addJobCollect(Job& job);
+    void addJobCollect(const Job& job);
     void startCollector(std::string collector);
-    void addJob2Collector(Job& job, std::string collector);
+    void addJob2Collector(int jobid, std::string collector);
+    void rmJobCollect(const Job& job);
     Config& global_config = Config::instance();
     TimerScheduler timerScheduler_;
     std::optional<StreamWatcher> job_opt_;
 
     struct collector_state{
-        std::vector<std::reference_wrapper<Job>> job_list;
+        std::vector<int> jobid_list;
         std::mutex              m_;
         size_t task_id;
         bool running;
@@ -77,7 +78,7 @@ private:
 
     std::mutex              m_;
     std::unordered_map<std::string, collector_info> collector_info_dict;
-    std::unordered_map<std::string, collector_state> collector_job_dict;
+    std::unordered_map<std::string, collector_state> collector_state_dict;
     std::vector<OnFinish>   finishCallbacks_;
     bool                    running_ = false;
 };

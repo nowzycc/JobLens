@@ -1,5 +1,6 @@
 #include "common/timer_scheduler.hpp"
 #include <iostream>
+#include <spdlog/spdlog.h>
 
 TimerScheduler::TimerScheduler(size_t numWorkers)
     : stop(false), nextId(0) {
@@ -110,7 +111,8 @@ void TimerScheduler::workerLoop() {
             try {
                 task();
             } catch (const std::exception& e) {
-                std::cerr << "Task execution failed: " << e.what() << std::endl;
+                spdlog::error("TimerScheduler: Task execution failed: {}",e.what());
+                // std::cerr << "Task execution failed: " << e.what() << std::endl;
             }
         }
     }
