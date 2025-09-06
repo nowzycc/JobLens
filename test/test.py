@@ -5,7 +5,7 @@ from threading import Thread
 import yaml
 import json
 import time
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,app
 
 Joblens_path = "/home/nowzycc/code/JobLens_cpp/build/JobLens"
 Config_path = "/home/nowzycc/code/JobLens_cpp/config/config.yaml"
@@ -58,11 +58,30 @@ def add_job_test():
     
     time.sleep(1)
     print(pid)
+    global pid
+    pid = None
+    def do_work():
+        exec_cmd = ["sysbench","cpu","run"]
+        result = subprocess.Popen(exec_cmd)
+        global pid
+        pid = result.pid
+        result.wait()
+    t = Thread(target=do_work)
+    t.start()
+    while pid == None:
+        pass
+    print(pid)
     correct_job_info = {
-        'JobID':300,
-        'JobPIDs':[pid],
-        'JobCreateTime':'2025-08-27 14:33:00',
-    }
+        "opt": "add",
+        "type": "job",
+        "JobID": 1,
+        "JobPIDs": [
+            pid
+        ],
+        "Lens": [
+            "proc_collector"
+        ]
+}
     err_job_info = {
         'JobID':4,
         'JobPIDs':[],
@@ -70,14 +89,15 @@ def add_job_test():
     }
     config = yaml.safe_load(open(Config_path))
     job_adder_path = config['collectors_config']['job_adder_fifo']
+    
     with open(job_adder_path, 'w') as f:
         f.write(json.dumps(correct_job_info))
         f.flush()
         print("Wrote correct job info")
         time.sleep(1)
-        f.write(json.dumps(err_job_info))
-        f.flush()
-        print("Wrote erroneous job info")
+        # f.write(json.dumps(err_job_info))
+        # f.flush()
+        # print("Wrote erroneous job info")
 
 # Config_path = os.getenv("CONFIG_PATH", "config.yaml")   # 可按需修改
 

@@ -14,59 +14,22 @@
 
 
 #include "collector/collector_type.h"
+#include "collector/collector_registry.hpp"
 #include <any>
 #include <iostream>
 #include <fmt/chrono.h>
-
-template<class K, class V>
-class lru_cache {
-public:
-    explicit lru_cache(std::size_t capacity) : cap_(capacity) {
-        if (cap_ == 0) throw std::invalid_argument("capacity must > 0");
-    }
-
-    /* 查询 */
-    std::optional<V> get(const K& key) {
-        auto it = map_.find(key);
-        if (it == map_.end()) return std::nullopt;
-        touch(it->second);          // 移到最新
-        return it->second->second;
-    }
-
-    /* 插入或更新 */
-    void put(const K& key, const V& val) {
-        auto it = map_.find(key);
-        if (it != map_.end()) {     // 已存在
-            it->second->second = val;
-            touch(it->second);
-            return;
-        }
-        if (map_.size() == cap_) {  // 满，淘汰最老
-            map_.erase(list_.back().first);
-            list_.pop_back();
-        }
-        list_.emplace_front(key, val);
-        map_[key] = list_.begin();
-    }
-
-    std::size_t size() const noexcept { return map_.size(); }
-
-private:
-    using node_t = std::pair<K, V>;                // list 中存的 kv 对
-    using list_t = std::list<node_t>;
-    using iter_t = typename list_t::iterator;
-
-    std::unordered_map<K, iter_t> map_;
-    list_t                        list_;
-    std::size_t                   cap_;
-
-    /* 把节点移到链表头 */
-    void touch(iter_t it) {
-        list_.splice(list_.begin(), list_, it);
-    }
-};
+#include <spdlog/spdlog.h>
 
 namespace proc_collector {
+
+
+/* 获取系统总内存（单位：KB），失败返回 nullopt */
+std::optional<std::size_t> getMemTotalKb();
+
+/* 对单个进程采集一次快照 */
+std::unique_ptr<proc_info> snapshotOf(int pid);
+
+
 
 /* ---------- 内部工具 ---------- */
 static std::size_t pageSize() {
@@ -90,29 +53,8 @@ std::optional<std::size_t> getMemTotalKb() {
     return std::nullopt;
 }
 
-std::unique_ptr<proc_info> snapshotOf(int pid) {
-    struct cpu_usage
-    {
-        double      cpuPercent{};      
-        unsigned long long utime{};
-        unsigned long long stime{};
-        unsigned long long starttime{};
-        long hz{};
-        long numCores{};
-        unsigned long long lastTotal{};
-        unsigned long long lastProc{};
-    };
-    //TODO:这里记得进行修改为可配置参数
-    static lru_cache<int, cpu_usage> pid_cpu_dict(256);
+std::unique_ptr<proc_info> ProcCollector::snapshotOf(int pid) {
     try {
-        if(pid_cpu_dict.get(pid) == std::nullopt)
-        {
-            std::cout<<"new pid"<<std::endl;
-            cpu_usage cu;
-            cu.lastProc = 0;
-            cu.lastTotal = 0;
-            pid_cpu_dict.put(pid, cu);
-        }
         auto info = std::make_unique<proc_info>();
         info->pid = pid;
 
@@ -215,7 +157,7 @@ std::unique_ptr<proc_info> snapshotOf(int pid) {
                 }
             }
         }
-        /* 6. /proc/<pid>/stat 中 CPU 时间 & 动态 CPU 使用率 --------------------- */
+                /* 6. /proc/<pid>/stat 中 CPU 时间 & 动态 CPU 使用率 --------------------- */
         {
             /* 注意：前面已经读过 /proc/<pid>/stat，但 istream 状态已失效，
                这里重新打开一次，保证代码独立可拷贝 */
@@ -267,23 +209,23 @@ std::unique_ptr<proc_info> snapshotOf(int pid) {
 
                 unsigned long long currTotal = cpuStat();
                 unsigned long long currProc  = utime + stime;
-                auto cu = pid_cpu_dict.get(pid);
+                auto& cu = pid_state_dict[pid];
                 std::cout<<"use pid:"<<pid<<std::endl;
-                unsigned long long deltaTotal = currTotal - cu->lastTotal;
-                unsigned long long deltaProc  = currProc  - cu->lastProc;
+                unsigned long long deltaTotal = currTotal - cu.lastTotal;
+                unsigned long long deltaProc  = currProc  - cu.lastProc;
                 std::cout<<"currTotal="<<currTotal<<"   currProc="<<currProc<<std::endl;
-                std::cout<<"lastTotal="<<cu->lastTotal<<"   lastProc="<<cu->lastProc<<std::endl;
+                std::cout<<"lastTotal="<<cu.lastTotal<<"   lastProc="<<cu.lastProc<<std::endl;
                 std::cout<<"deltaTotal="<<deltaTotal<<"   deltaProc="<<deltaProc<<std::endl;
                 if (deltaTotal > 0) {
-                    info->cpuPercent = 100.0 * double(deltaProc) / double(deltaTotal);
+                    info->cpuPercent = 100.0 * double(deltaProc) / double(deltaTotal) * info->numCores;
                 } else {
                     info->cpuPercent = 0.0;
                 }
 
                 /* 更新静态缓存（用于下一次采样） */
-                cu->lastTotal = currTotal;
-                cu->lastProc  = currProc;
-                std::cout<<"lastTotal="<<cu->lastTotal<<"   lastProc="<<cu->lastProc<<std::endl;
+                cu.lastTotal = currTotal;
+                cu.lastProc  = currProc;
+                std::cout<<"lastTotal="<<cu.lastTotal<<"   lastProc="<<cu.lastProc<<std::endl;
             } else {
                 info->cpuPercent = 0.0;
             }
@@ -293,20 +235,44 @@ std::unique_ptr<proc_info> snapshotOf(int pid) {
     } catch (...) {
         return nullptr;
     }
+
 }
 
-std::any collect(Job& job) {
+std::any ProcCollector::impl_collect(const Job& job) {
     std::vector<std::shared_ptr<proc_info>> infos;
     auto time_start = std::chrono::system_clock::now();
     for (int pid : job.JobPIDs) {
         if (pid <= 0) continue;
         auto info = snapshotOf(pid);
         if (!info) continue;
-        job.JobInfo[fmt::format("proc_info_{}", pid)] = info.get();
+        // job.JobInfo[fmt::format("proc_info_{}", pid)] = info.get();
         infos.emplace_back(std::move(info));
     }
     std::any a = std::move(infos); 
     return a;
+}
+
+namespace {
+    struct AutoReg {
+        AutoReg() {
+            CollectorRegistry::instance().registerCollector<ProcCollector>("ProcCollector");
+        }
+    };
+    static AutoReg _auto_reg;   // 关键：全局对象，构造函数在 main() 前执行
+}
+
+bool ProcCollector::init(const nlohmann::json& cfg) {
+    spdlog::info("ProcCollector init with config: {}", cfg.dump());
+    // 这里可以解析 cfg["interval"] 等
+    return true;
+}
+
+CollectResult ProcCollector::collect(const Job& job) {
+    return impl_collect(job);   // 复用你原来的 collect() 逻辑
+}
+
+void ProcCollector::deinit() noexcept {
+    spdlog::info("ProcCollector deinit");
 }
 
 }

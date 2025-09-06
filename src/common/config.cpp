@@ -60,7 +60,16 @@ std::string Config::getString(const std::string& parentKey,
     }
 }
 
-
+YAML::Node Config::getRawNode(const std::string& parentKey) const
+{
+    try {
+        return root_[parentKey];
+    } catch (const YAML::Exception& e) {
+        spdlog::error("Config: error decoding raw node [{}][{}]: {}", parentKey, e.what());
+        throw std::runtime_error("Config: missing or bad type for [" +
+                                 parentKey + "]");
+    }
+}
 
 // 常见模板实例化
 template std::vector<int>    Config::getArray<int>    (const std::string&, const std::string&) const;

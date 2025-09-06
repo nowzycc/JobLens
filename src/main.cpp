@@ -10,7 +10,9 @@
 #include "common/job_starter.hpp"
 #include "common/permission_opt.hpp"
 
+#include "collector/job_registry.hpp"
 #include "collector/job_info_collector.hpp"
+#include <signal.h>
 
 void onExitCallback(int pid, int exit_code) {
     JobInfoCollector::instance().shutdown();
@@ -29,8 +31,8 @@ void onBecomeMaster() {
     if (first_run) {
         first_run = false;
         auto pid = JobStarter::instance().getChildPID();
-        JobInfoCollector::instance().addJob({
-            .JobID = 1, 
+        JobRegistry::instance().addJob({
+            .JobID = 1,
             .JobPIDs = {pid},
             .JobCreateTime = std::chrono::system_clock::now()
         });
@@ -77,6 +79,7 @@ void print_logo(){
 }
 
 void init() {
+    print_logo();
     // 初始化日志系统
     const static auto log_level_map = std::map<std::string, spdlog::level::level_enum>{
         {"trace", spdlog::level::trace},
@@ -100,6 +103,27 @@ void init() {
 
 void get_main_mtx(){
 
+}
+
+bool already_running()
+{
+    auto PIDFILE = Config::instance().getString("lens_config", "lock_path");
+    std::ifstream ifs(PIDFILE);
+    if (ifs) {
+        pid_t oldpid;
+        ifs >> oldpid;
+        if (oldpid > 0 && kill(oldpid, 0) == 0)   // 0 信号仅检测
+            return true;                          // 同名进程存活
+    }
+
+    /* 把当前 pid 写进去 */
+    std::ofstream ofs(PIDFILE);
+    if (!ofs) {
+        std::cerr << "cannot create " << PIDFILE << "\n";
+        return false;                             // 保守起见，允许启动
+    }
+    ofs << getpid() << std::endl;
+    return false;                                 // 可以继续跑
 }
 
 int main(int argc, char* argv[]) {
@@ -161,6 +185,10 @@ int main(int argc, char* argv[]) {
     }
 
     if (mode.compare("service") == 0){
+        if(already_running()){
+            spdlog::critical("Main: Anothor JobLens has already started");
+            return 0;
+        }
         onBecomeService();
     }
     

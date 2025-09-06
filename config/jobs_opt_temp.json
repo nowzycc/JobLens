@@ -1,0 +1,9 @@
+{
+    "opt": "add",
+    "type": "job",
+    "JobID": 1,
+    "JobPIDs": 1,
+    "Lens": [
+        "proc_collector"
+    ]
+}
