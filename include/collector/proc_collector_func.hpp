@@ -25,6 +25,11 @@ struct proc_info {
     std::string name;
     int         ppid{};
     double      cpuPercent{};      // CPU 占用率
+    unsigned long long utime{};
+    unsigned long long stime{};
+    unsigned long long starttime{};
+    long hz{};
+    long numCores{};
     std::size_t memoryRss{};       // 字节
     double      memoryPercent{};
     int         numThreads{};
@@ -34,20 +39,21 @@ struct proc_info {
     std::string status{"unknown"};
 };
 
-/* 获取系统总内存（单位：KB），失败返回 nullopt */
-std::optional<std::size_t> getMemTotalKb();
-
-/* 对单个进程采集一次快照 */
-std::unique_ptr<proc_info> snapshotOf(int pid);
-
-/* 根据 Job 对象采集所有目标进程 */
-std::any collect(Job& job);
-
 class ProcCollector : public ICollector {
 public:
     bool init(const nlohmann::json& cfg) override;
     CollectResult collect(const Job& job) override;
     void deinit() noexcept override;
+private:
+    std::any impl_collect(const Job& job);
+    std::unique_ptr<proc_info> snapshotOf(int pid);
+
+    struct pid_state{
+        unsigned long long lastTotal{};
+        unsigned long long lastProc{};
+    };
+
+    std::unordered_map<int, pid_state> pid_state_dict;
 };
 
 
