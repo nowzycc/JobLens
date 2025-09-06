@@ -13,6 +13,7 @@ std::string string2JobOpt(const std::string& str, Job& job) {
     auto opt = j["opt"].get<std::string>();
     job.JobID = j["JobID"].get<int>();
     job.JobPIDs = j["JobPIDs"].get<std::vector<int>>();
+    job.CollectorNames = j["Lens"].get<std::vector<std::string>>();
     if (job.JobPIDs.size() == 0) {
         spdlog::warn("JobRegistry: job ID {} has empty PID list", job.JobID);
     }
@@ -44,7 +45,17 @@ JobRegistry::JobRegistry(){
             },
             [this](const char* buf, std::size_t len) {
                 Job job;
-                auto opt = string2JobOpt(std::string(buf, len), job);
+                std::string opt;
+                try
+                {
+                    opt = string2JobOpt(std::string(buf, len), job);
+                }
+                catch(const std::exception& e)
+                {
+                    spdlog::error("JobRegistry: job_opt parse error: {}",e.what());
+                    return;
+                }
+                
                 if(opt.compare("add") == 0){
                     addJob(job);
                 }
@@ -52,6 +63,7 @@ JobRegistry::JobRegistry(){
                     delJob(job.JobID);
                 }
         });
+        job_opt_->start();
     };
 
 JobRegistry& JobRegistry::instance() {
@@ -69,7 +81,7 @@ void JobRegistry::addJob(Job job) {
         jobs_.emplace(job.JobID, std::move(job));
     }
     for (const auto& cb : cbs_) cb(JobEvent::Added, jobs_.at(job.JobID));
-    spdlog::info("JobRegistry: add job with JobID {}, JobPIDs {}", job.JobID, job.JobPIDs);
+    spdlog::info("JobRegistry: add job with JobID {}", job.JobID);
 }
 
 void JobRegistry::delJob(int jobID) {
@@ -82,7 +94,7 @@ void JobRegistry::delJob(int jobID) {
         jobs_.erase(it);
     }
     for (const auto& cb : cbs_) cb(JobEvent::Removed, removed);
-    spdlog::info("JobRegistry: remove job with JobID {}, JobPIDs {}", removed.JobID, removed.JobPIDs);
+    spdlog::info("JobRegistry: remove job with JobID {}, JobPIDs {}", removed.JobID);
 }
 
 inline bool is_process_running(pid_t pid) {
@@ -110,6 +122,7 @@ const Job* JobRegistry::findJob(int jobID) const
 
         if (job.JobPIDs.empty()) {
             toDelete.push_back(jobID);   
+            spdlog::info("JobRegistry: job {} has no running process, delete it", job.JobID);
         }
         ret = &it->second;
     }  

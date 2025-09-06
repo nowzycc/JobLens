@@ -57,7 +57,6 @@ private:
     void rmJobCollect(const Job& job);
     Config& global_config = Config::instance();
     TimerScheduler timerScheduler_;
-    std::optional<StreamWatcher> job_opt_;
 
     struct collector_state{
         std::vector<int> jobid_list;

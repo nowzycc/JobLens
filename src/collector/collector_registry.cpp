@@ -2,6 +2,7 @@
 #include "collector/collector_registry.hpp"
 #include "collector/collector_type.h"
 #include <mutex>
+#include <iostream>
 
 CollectorRegistry& CollectorRegistry::instance() {
     static CollectorRegistry reg;

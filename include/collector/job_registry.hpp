@@ -4,6 +4,8 @@
 #include <shared_mutex>
 #include <vector>
 #include <functional>
+#include <optional>
+#include "common/streamer_watcher.hpp"
 #include "collector/collector_type.h"
 #include "job_lifecycle_event.h"
 
@@ -12,7 +14,9 @@
 class JobRegistry {
 public:
     static JobRegistry& instance();          // 仍保留单例，方便迁移；也可由 main() 构造
-    ~JobRegistry() = default;
+    ~JobRegistry(){
+        job_opt_->stop();
+    };
 
     // 禁止拷贝
     JobRegistry(const JobRegistry&)            = delete;

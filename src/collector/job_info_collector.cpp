@@ -114,6 +114,7 @@ void JobInfoCollector::startCollector(std::string collector_name){
             
         }
     );
+    spdlog::info("JobInfoCollector: start collector {}", collector_name);
 
 }
 
@@ -182,7 +183,6 @@ void JobInfoCollector::start() {
     std::lock_guard lg(m_);
     if (running_) return;
     running_ = true;
-    job_opt_->start(); //开始接收任务添加
 }
 
 void JobInfoCollector::shutdown() {
@@ -191,7 +191,6 @@ void JobInfoCollector::shutdown() {
         if (!running_) return;
         running_ = false;
     }
-    job_opt_->stop();
     timerScheduler_.shutdown();
     writer_manager::instance().shutdown();
     spdlog::info("JobInfoCollector: writer_manager shutdown complete");
